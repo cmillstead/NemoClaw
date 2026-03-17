@@ -9,8 +9,11 @@ digest: ""  # Computed at release time
 profiles:
   - default
   - ncp
+  - openrouter
   - nim-local
   - vllm
+  - ollama
+  - custom
 
 description: |
   NemoClaw blueprint: orchestrates OpenClaw sandbox creation, migration,
@@ -53,6 +56,29 @@ components:
         model: "nvidia/nemotron-3-nano-30b-a3b"
         credential_env: "OPENAI_API_KEY"
         credential_default: "dummy"
+
+      ollama:
+        provider_type: "openai"
+        provider_name: "ollama-local"
+        endpoint: "http://localhost:11434/v1"
+        model: ""
+        credential_env: "OPENAI_API_KEY"
+        credential_default: "ollama"
+
+      openrouter:
+        provider_type: "openai"
+        provider_name: "openrouter"
+        endpoint: "https://openrouter.ai/api/v1"
+        model: ""
+        credential_env: "OPENROUTER_API_KEY"
+
+      custom:
+        provider_type: "openai"
+        provider_name: "custom"
+        endpoint: ""
+        model: ""
+        credential_env: "OPENAI_API_KEY"
+        dynamic_endpoint: true
 
   policy:
     base: "sandboxes/openclaw/policy.yaml"

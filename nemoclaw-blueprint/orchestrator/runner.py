@@ -198,7 +198,15 @@ def action_apply(
     credential_default: str = inference_cfg.get("credential_default", "")
     credential = ""
     if credential_env:
-        credential = os.environ.get(credential_env, credential_default)
+        credential = os.environ.get(credential_env, "")
+        if not credential and credential_default:
+            credential = credential_default
+        if not credential:
+            log(
+                f"WARNING: {credential_env} not set in environment. "
+                f"Inference provider '{provider_name}' may fail to authenticate. "
+                f"Set it with: export {credential_env}=<your-key>"
+            )
 
     provider_args = [
         "openshell",
