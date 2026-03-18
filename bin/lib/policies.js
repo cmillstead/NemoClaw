@@ -6,6 +6,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const crypto = require("node:crypto");
 const { ROOT, run, runCapture } = require("./runner");
 const registry = require("./registry");
 
@@ -160,7 +161,7 @@ function applyPreset(sandboxName, presetName) {
   }
 
   // Write temp file and apply
-  const tmpFile = path.join(os.tmpdir(), `nemoclaw-policy-${Date.now()}.yaml`);
+  const tmpFile = path.join(os.tmpdir(), `nemoclaw-policy-${crypto.randomBytes(8).toString("hex")}.yaml`);
   fs.writeFileSync(tmpFile, merged, "utf-8");
 
   try {

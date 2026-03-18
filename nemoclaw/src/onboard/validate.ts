@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import dns from "node:dns";
+
 export interface ValidationResult {
   valid: boolean;
   models: string[];
@@ -18,6 +20,30 @@ const PRIVATE_RANGES = [
   /^fc00:/,
   /^fe80:/,
 ];
+
+function isPrivateIP(ip: string): boolean {
+  return PRIVATE_RANGES.some((range) => range.test(ip));
+}
+
+async function checkResolvedIPs(hostname: string): Promise<{ valid: boolean; error?: string }> {
+  const ips: string[] = [];
+  try {
+    const v4 = await dns.promises.resolve4(hostname).catch(() => [] as string[]);
+    const v6 = await dns.promises.resolve6(hostname).catch(() => [] as string[]);
+    ips.push(...v4, ...v6);
+  } catch {
+    return { valid: false, error: "DNS resolution failed — cannot verify endpoint safety" };
+  }
+  if (ips.length === 0) {
+    return { valid: false, error: "DNS resolution returned no addresses" };
+  }
+  for (const ip of ips) {
+    if (isPrivateIP(ip) || /^::ffff:/i.test(ip)) {
+      return { valid: false, error: "URL resolves to a private/internal network address" };
+    }
+  }
+  return { valid: true };
+}
 
 function validateEndpointUrl(endpointUrl: string): { valid: boolean; error?: string } {
   let parsed: URL;
@@ -58,6 +84,13 @@ export async function validateApiKey(
   const urlCheck = validateEndpointUrl(endpointUrl);
   if (!urlCheck.valid) {
     return { valid: false, models: [], error: urlCheck.error ?? "Invalid endpoint URL" };
+  }
+  const parsed = new URL(endpointUrl);
+  if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+    const dnsCheck = await checkResolvedIPs(parsed.hostname);
+    if (!dnsCheck.valid) {
+      return { valid: false, models: [], error: dnsCheck.error ?? "DNS check failed" };
+    }
   }
   const url = new URL("/models", endpointUrl.replace(/\/+$/, "")).toString();
   const controller = new AbortController();
@@ -142,6 +175,13 @@ export async function validateEndpointReachable(
   const urlCheck = validateEndpointUrl(endpointUrl);
   if (!urlCheck.valid) {
     return { reachable: false, error: urlCheck.error };
+  }
+  const parsed = new URL(endpointUrl);
+  if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+    const dnsCheck = await checkResolvedIPs(parsed.hostname);
+    if (!dnsCheck.valid) {
+      return { reachable: false, error: dnsCheck.error };
+    }
   }
   const url = new URL("/models", endpointUrl.replace(/\/+$/, "")).toString();
   const controller = new AbortController();

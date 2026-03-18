@@ -155,7 +155,7 @@ describe("goose tool", () => {
         // Restore original values
         for (const key of sensitiveKeys) {
           if (saved[key] === undefined) {
-            delete process.env[key];
+            process.env[key] = undefined as unknown as string;
           } else {
             process.env[key] = saved[key];
           }

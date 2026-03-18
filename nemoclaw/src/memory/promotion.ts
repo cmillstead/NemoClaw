@@ -196,7 +196,7 @@ function writeDailyNote(memoryDir: string, sessionId: string, promotedPaths: str
   try {
     const today = new Date().toISOString().split("T")[0];
     const dailyDir = join(memoryDir, "daily");
-    mkdirSync(dailyDir, { recursive: true });
+    mkdirSync(dailyDir, { recursive: true, mode: 0o700 });
     const dailyPath = join(dailyDir, `${today}.md`);
 
     let content: string;

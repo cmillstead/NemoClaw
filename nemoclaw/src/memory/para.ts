@@ -153,18 +153,18 @@ export function writeFact(
 function formatFactFile(fm: ParaFactFrontmatter, context?: string): string {
   const yamlLines = [
     "---",
-    `id: ${fm.id}`,
+    `id: ${JSON.stringify(fm.id)}`,
     `fact: ${JSON.stringify(fm.fact)}`,
-    `category: ${fm.category}`,
-    `status: ${fm.status}`,
+    `category: ${JSON.stringify(fm.category)}`,
+    `status: ${JSON.stringify(fm.status)}`,
     `tags:`,
     ...fm.tags.map((t) => `  - ${t}`),
     `created_at: ${JSON.stringify(fm.created_at)}`,
     `updated_at: ${JSON.stringify(fm.updated_at)}`,
-    `source_session: ${fm.source_session}`,
-    `source_type: ${fm.source_type}`,
-    `superseded_by: ${fm.superseded_by ?? "null"}`,
-    `supersedes: ${fm.supersedes ?? "null"}`,
+    `source_session: ${JSON.stringify(fm.source_session)}`,
+    `source_type: ${JSON.stringify(fm.source_type)}`,
+    `superseded_by: ${fm.superseded_by != null ? JSON.stringify(fm.superseded_by) : "null"}`,
+    `supersedes: ${fm.supersedes != null ? JSON.stringify(fm.supersedes) : "null"}`,
     `access_count: ${String(fm.access_count)}`,
     `content_hash: ${JSON.stringify(fm.content_hash)}`,
     "---",
@@ -279,9 +279,9 @@ export function listFacts(memoryDir: string, category?: ParaCategory): string[] 
 export function supersedeFact(filePath: string, supersededById?: string): boolean {
   try {
     const content = readFileSync(filePath, "utf-8");
-    let updated = content.replace(/^status: active$/m, "status: superseded");
+    let updated = content.replace(/^status: "active"$/m, 'status: "superseded"');
     if (supersededById) {
-      updated = updated.replace(/^superseded_by: null$/m, `superseded_by: ${supersededById}`);
+      updated = updated.replace(/^superseded_by: null$/m, `superseded_by: ${JSON.stringify(supersededById)}`);
     }
     updated = updated.replace(
       /^updated_at: .*$/m,

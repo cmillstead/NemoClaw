@@ -478,7 +478,7 @@ function copyDirectory(sourcePath: string, destinationPath: string): void {
 }
 
 function writeSnapshotManifest(snapshotDir: string, manifest: SnapshotManifest): void {
-  writeFileSync(path.join(snapshotDir, "snapshot.json"), JSON.stringify(manifest, null, 2));
+  writeFileSync(path.join(snapshotDir, "snapshot.json"), JSON.stringify(manifest, null, 2), { mode: 0o600 });
 }
 
 function readSnapshotManifest(snapshotDir: string): SnapshotManifest | null {
@@ -562,7 +562,7 @@ function prepareSandboxState(snapshotDir: string, manifest: SnapshotManifest): s
     }
   }
 
-  writeFileSync(path.join(preparedStateDir, "openclaw.json"), JSON.stringify(config, null, 2));
+  writeFileSync(path.join(preparedStateDir, "openclaw.json"), JSON.stringify(config, null, 2), { mode: 0o600 });
   return preparedStateDir;
 }
 

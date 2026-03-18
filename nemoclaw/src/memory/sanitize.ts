@@ -35,6 +35,9 @@ const SECRET_PATTERNS: readonly { pattern: RegExp; redact: RegExp; label: string
   },
   { pattern: /\bAKIA[0-9A-Z]{16}\b/, redact: /\bAKIA[0-9A-Z]{16}\b/g, label: "AWS access key" },
   { pattern: /\bAIza[0-9A-Za-z_-]{35}\b/, redact: /\bAIza[0-9A-Za-z_-]{35}\b/g, label: "Google API key" },
+  { pattern: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/, redact: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/g, label: "Anthropic API key" },
+  { pattern: /\bhf_[a-zA-Z0-9]{20,}\b/, redact: /\bhf_[a-zA-Z0-9]{20,}\b/g, label: "Hugging Face token" },
+  { pattern: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/, redact: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/g, label: "Telegram bot token" },
   {
     pattern: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/,
     redact: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/g,
@@ -65,6 +68,9 @@ const INJECTION_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
  * Scan content for secrets. Returns invalid result if any secret pattern matches.
  */
 export function scanForSecrets(content: string): SanitizeResult {
+  if (content.length > 1_048_576) {
+    content = content.slice(0, 1_048_576);
+  }
   for (const { pattern, label } of SECRET_PATTERNS) {
     if (pattern.test(content)) {
       return { valid: false, reason: `Content contains potential ${label}` };

@@ -27,7 +27,8 @@ const SAFE_ENV_KEYS = ["PATH", "HOME", "TERM", "SHELL", "USER", "LANG"] as const
 export function buildSafeBaseEnv(): Record<string, string> {
   const safe: Record<string, string> = {};
   for (const key of SAFE_ENV_KEYS) {
-    if (process.env[key]) safe[key] = process.env[key]!;
+    const val = process.env[key];
+    if (val) safe[key] = val;
   }
   return safe;
 }
