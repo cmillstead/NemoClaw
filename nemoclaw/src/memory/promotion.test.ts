@@ -6,9 +6,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TranscriptDb } from "./transcript-db.js";
-import { promoteFactNow, promoteEndOfSession } from "./promotion.js";
+import { promoteFactNow, promoteEndOfSession, promoteFromMessages } from "./promotion.js";
 import { DEFAULT_MEMORY_CONFIG } from "./types.js";
-import type { MemoryConfig } from "./types.js";
+import type { MemoryConfig, MessageRecord } from "./types.js";
 import type { PluginLogger } from "../index.js";
 
 function makeLogger(): PluginLogger {
@@ -128,6 +128,68 @@ describe("promotion", () => {
       const promoted = promoteEndOfSession(db, config, "sess-001", makeLogger());
       // May or may not match depending on exact extraction; key is no crash
       expect(promoted.length).toBeLessThanOrEqual(config.maxAutoPromotedFacts);
+    });
+  });
+
+  describe("promoteFromMessages", () => {
+    it("promotes facts from a raw message array", () => {
+      const messages: MessageRecord[] = [
+        {
+          id: 1,
+          session_id: "sess-001",
+          role: "user",
+          content: "Remember that the API uses REST not GraphQL",
+          token_count: 20,
+          created_at: new Date().toISOString(),
+          compacted: 0,
+          compaction_id: null,
+        },
+        {
+          id: 2,
+          session_id: "sess-001",
+          role: "assistant",
+          content: "I'll remember that.",
+          token_count: 10,
+          created_at: new Date().toISOString(),
+          compacted: 0,
+          compaction_id: null,
+        },
+      ];
+
+      const promoted = promoteFromMessages(
+        db,
+        config,
+        "sess-001",
+        messages,
+        "auto",
+        makeLogger(),
+      );
+      expect(promoted.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("returns empty for messages with no promotable content", () => {
+      const messages: MessageRecord[] = [
+        {
+          id: 1,
+          session_id: "sess-001",
+          role: "user",
+          content: "Hello",
+          token_count: 5,
+          created_at: new Date().toISOString(),
+          compacted: 0,
+          compaction_id: null,
+        },
+      ];
+
+      const promoted = promoteFromMessages(
+        db,
+        config,
+        "sess-001",
+        messages,
+        "auto",
+        makeLogger(),
+      );
+      expect(promoted).toHaveLength(0);
     });
   });
 });

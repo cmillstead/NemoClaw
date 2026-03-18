@@ -73,28 +73,26 @@ export function promoteFactNow(
 }
 
 /**
- * End-of-session fact extraction -- runs during session close.
- * Extracts up to maxAutoPromotedFacts candidates from the full transcript.
+ * Promote facts from an arbitrary message array.
+ * Used by both end-of-session promotion and subagent fact capture.
  */
-export function promoteEndOfSession(
+export function promoteFromMessages(
   db: TranscriptDb,
   config: MemoryConfig,
   sessionId: string,
+  messages: MessageRecord[],
+  source: FactSourceType,
   logger: PluginLogger,
 ): string[] {
-  const messages = db.getAllMessages(sessionId);
   if (messages.length === 0) return [];
 
   const candidates = extractCandidates(messages);
-
-  // Sort by priority descending
   candidates.sort((a, b) => b.priority - a.priority);
 
   const promoted: string[] = [];
   for (const candidate of candidates) {
     if (promoted.length >= config.maxAutoPromotedFacts) break;
 
-    // Validate
     const secretCheck = scanForSecrets(candidate.fact);
     if (!secretCheck.valid) {
       logger.warn(`Skipping candidate (secret detected): ${secretCheck.reason ?? "unknown"}`);
@@ -106,7 +104,6 @@ export function promoteEndOfSession(
       continue;
     }
 
-    // Deduplicate
     const hash = contentHash(candidate.fact);
     if (db.isFactAlreadyPromoted(hash)) continue;
 
@@ -116,7 +113,7 @@ export function promoteEndOfSession(
         candidate.fact,
         candidate.category,
         sessionId,
-        "auto",
+        source,
         candidate.tags,
         candidate.context,
       );
@@ -127,17 +124,32 @@ export function promoteEndOfSession(
         fact_file_path: result.filePath,
         content_hash: result.hash,
         promoted_at: new Date().toISOString(),
-        source: "auto",
+        source,
       });
 
       promoted.push(result.filePath);
-      logger.info(`Auto-promoted fact: ${result.filePath}`);
+      logger.info(`Promoted fact (${String(source)}): ${result.filePath}`);
     } catch (err) {
       logger.warn(`Failed to promote fact: ${String(err)}`);
     }
   }
 
-  // Write daily note
+  return promoted;
+}
+
+/**
+ * End-of-session fact extraction -- runs during session close.
+ * Extracts up to maxAutoPromotedFacts candidates from the full transcript.
+ */
+export function promoteEndOfSession(
+  db: TranscriptDb,
+  config: MemoryConfig,
+  sessionId: string,
+  logger: PluginLogger,
+): string[] {
+  const messages = db.getAllMessages(sessionId);
+  const promoted = promoteFromMessages(db, config, sessionId, messages, "auto", logger);
+
   if (promoted.length > 0) {
     writeDailyNote(config.memoryDir, sessionId, promoted);
   }
