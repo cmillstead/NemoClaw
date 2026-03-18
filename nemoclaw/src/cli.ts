@@ -17,7 +17,7 @@ import { cliEject } from "./commands/eject.js";
 import { cliLogs } from "./commands/logs.js";
 import { cliOnboard } from "./commands/onboard.js";
 import { join } from "node:path";
-import { existsSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, rmSync, readFileSync, symlinkSync } from "node:fs";
 import { ensureMemoryDirs, updateRootMoc, listFacts, regenerateManifest } from "./memory/para.js";
 import { scanForSecrets, scanForInjection } from "./memory/sanitize.js";
 
@@ -156,6 +156,34 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
       ensureMemoryDirs(memoryDir);
       updateRootMoc(memoryDir);
       logger.info(`Memory directory initialized at ${memoryDir}`);
+
+      // Create Obsidian symlink if vault exists
+      const obsidianProjectsDir = join(
+        process.env.HOME ?? "/tmp",
+        "Documents",
+        "obsidian-vault",
+        "projects",
+      );
+      const symlinkTarget = join(obsidianProjectsDir, "nemoclaw-memory");
+      if (existsSync(obsidianProjectsDir) && !existsSync(symlinkTarget)) {
+        try {
+          symlinkSync(memoryDir, symlinkTarget);
+          logger.info(`Obsidian symlink: ${symlinkTarget} -> ${memoryDir}`);
+        } catch (err) {
+          logger.warn(`Could not create Obsidian symlink: ${String(err)}`);
+        }
+      }
+
+      // Create QMD-indexable symlink in ~/src/ so QMD can find memory files
+      const qmdSymlink = join(process.env.HOME ?? "/tmp", "src", ".nemoclaw-memory");
+      if (!existsSync(qmdSymlink)) {
+        try {
+          symlinkSync(memoryDir, qmdSymlink);
+          logger.info(`QMD symlink: ${qmdSymlink} -> ${memoryDir}`);
+        } catch (err) {
+          logger.warn(`Could not create QMD symlink: ${String(err)}`);
+        }
+      }
     });
 
   memory
@@ -199,6 +227,6 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
         }
       }
       regenerateManifest(memoryDir);
-      logger.info(`Audit complete: ${facts.length} files scanned, ${issues} issues found.`);
+      logger.info(`Audit complete: ${String(facts.length)} files scanned, ${String(issues)} issues found.`);
     });
 }
