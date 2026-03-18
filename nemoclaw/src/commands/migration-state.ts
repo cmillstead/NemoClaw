@@ -18,6 +18,7 @@ import path from "node:path";
 import { create as createTar } from "tar";
 import JSON5 from "json5";
 import type { PluginLogger } from "../index.js";
+import { slugify } from "../memory/sanitize.js";
 
 const SANDBOX_MIGRATION_DIR = "/sandbox/.nemoclaw/migration";
 const SNAPSHOT_VERSION = 2;
@@ -175,12 +176,9 @@ function collectSymlinkPaths(rootPath: string): string[] {
   return symlinks.sort();
 }
 
-function slugify(input: string): string {
-  const slug = input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "root";
+// Slugify imported from sanitize.ts — with "root" fallback for empty IDs
+function slugifyForId(input: string): string {
+  return slugify(input) || "root";
 }
 
 function registerRoot(
@@ -202,7 +200,7 @@ function registerRoot(
     return;
   }
 
-  const id = `${params.sandboxGroup}-${slugify(params.label)}`;
+  const id = `${params.sandboxGroup}-${slugifyForId(params.label)}`;
   rootMap.set(normalized, {
     id,
     kind: params.kind,
@@ -483,10 +481,15 @@ function writeSnapshotManifest(snapshotDir: string, manifest: SnapshotManifest):
   writeFileSync(path.join(snapshotDir, "snapshot.json"), JSON.stringify(manifest, null, 2));
 }
 
-function readSnapshotManifest(snapshotDir: string): SnapshotManifest {
-  return JSON.parse(
-    readFileSync(path.join(snapshotDir, "snapshot.json"), "utf-8"),
-  ) as SnapshotManifest;
+function readSnapshotManifest(snapshotDir: string): SnapshotManifest | null {
+  try {
+    return JSON.parse(
+      readFileSync(path.join(snapshotDir, "snapshot.json"), "utf-8"),
+    ) as SnapshotManifest;
+  } catch {
+    // Corrupt or missing manifest
+    return null;
+  }
 }
 
 function resolveConfigSourcePath(manifest: SnapshotManifest, snapshotDir: string): string {
@@ -654,12 +657,16 @@ export async function createArchiveFromDirectory(
   );
 }
 
-export function loadSnapshotManifest(snapshotDir: string): SnapshotManifest {
+export function loadSnapshotManifest(snapshotDir: string): SnapshotManifest | null {
   return readSnapshotManifest(snapshotDir);
 }
 
 export function restoreSnapshotToHost(snapshotDir: string, logger: PluginLogger): boolean {
   const manifest = readSnapshotManifest(snapshotDir);
+  if (!manifest) {
+    logger.error(`Failed to read snapshot manifest from: ${snapshotDir}`);
+    return false;
+  }
   const snapshotStateDir = path.join(snapshotDir, "openclaw");
   if (!existsSync(snapshotStateDir)) {
     logger.error(`Snapshot directory not found: ${snapshotStateDir}`);

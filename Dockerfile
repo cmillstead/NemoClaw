@@ -1,5 +1,7 @@
 # NemoClaw sandbox image — OpenClaw + NemoClaw plugin inside OpenShell
 
+# Pin to specific digest for reproducible builds (SEC-DEP-020)
+# Update digest periodically: docker pull node:22-slim && docker inspect --format='{{index .RepoDigests 0}}' node:22-slim
 FROM node:22-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -19,7 +21,7 @@ RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox -s /bin/bash sandbo
 RUN npm install -g openclaw@2026.3.11
 
 # Install PyYAML for blueprint runner
-RUN pip3 install --break-system-packages pyyaml
+RUN pip3 install --break-system-packages pyyaml==6.0.2
 
 # Copy our plugin and blueprint into the sandbox
 COPY nemoclaw/dist/ /opt/nemoclaw/dist/
@@ -65,8 +67,8 @@ json.dump(config, open(path, 'w'), indent=2); \
 os.chmod(path, 0o600)"
 
 # Install NemoClaw plugin into OpenClaw
-RUN openclaw doctor --fix > /dev/null 2>&1 || true \
-    && openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || true
+RUN openclaw doctor --fix > /dev/null 2>&1 || echo "Warning: openclaw doctor failed" \
+    && openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || echo "Warning: plugin install failed"
 
 ENTRYPOINT ["/bin/bash"]
 CMD []

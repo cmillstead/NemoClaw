@@ -52,4 +52,45 @@ function runCapture(cmd, opts = {}) {
   }
 }
 
-module.exports = { ROOT, SCRIPTS, run, runCapture };
+function runArgv(cmd, args = [], opts = {}) {
+  const result = spawnSync(cmd, args, {
+    stdio: "inherit",
+    cwd: ROOT,
+    env: { ...process.env, ...opts.env },
+    ...opts,
+  });
+  if (result.status !== 0 && !opts.ignoreError) {
+    console.error(`  Command failed (exit ${result.status}): ${cmd} ${args.join(" ").slice(0, 60)}`);
+    process.exit(result.status || 1);
+  }
+  return result;
+}
+
+function runCaptureArgv(cmd, args = [], opts = {}) {
+  const { execFileSync: efs } = require("child_process");
+  try {
+    return efs(cmd, args, {
+      encoding: "utf-8",
+      cwd: ROOT,
+      env: { ...process.env, ...opts.env },
+      stdio: ["pipe", "pipe", "pipe"],
+      ...opts,
+    }).trim();
+  } catch (err) {
+    if (opts.ignoreError) return "";
+    throw err;
+  }
+}
+
+const RFC1123_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+function validateInstanceName(name) {
+  if (!RFC1123_RE.test(name)) {
+    console.error(`  Invalid instance name: '${name}'`);
+    console.error("  Names must be lowercase, contain only letters, numbers, and hyphens,");
+    console.error("  and must start and end with a letter or number.");
+    process.exit(1);
+  }
+}
+
+module.exports = { ROOT, SCRIPTS, run, runCapture, runArgv, runCaptureArgv, validateInstanceName };

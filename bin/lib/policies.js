@@ -29,6 +29,10 @@ function listPresets() {
 }
 
 function loadPreset(name) {
+  if (!/^[a-z0-9-]+$/.test(name)) {
+    console.error(`  Invalid preset name: ${name}`);
+    return null;
+  }
   const file = path.join(PRESETS_DIR, `${name}.yaml`);
   if (!fs.existsSync(file)) {
     console.error(`  Preset not found: ${name}`);

@@ -5,7 +5,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { ROOT, SCRIPTS, run, runCapture } = require("./runner");
+const { ROOT, SCRIPTS, run, runCapture, runArgv, runCaptureArgv } = require("./runner");
 const { prompt, ensureApiKey, getCredential } = require("./credentials");
 const registry = require("./registry");
 const nim = require("./nim");
@@ -208,6 +208,7 @@ async function createSandbox(gpu) {
   }
   // set -o pipefail ensures the openshell exit code propagates through the awk pipe.
   // Without it, awk's exit code (always 0) would mask a failed sandbox create.
+  // sandboxName is RFC 1123 validated above (line 163)
   run(`set -o pipefail; openshell sandbox create ${createArgs.join(" ")} -- env ${envArgs.join(" ")} nemoclaw-start 2>&1 | awk '/Sandbox allocated/{if(!seen){print;seen=1}next}1'`);
 
   // Release any stale forward on port 18789 before claiming it for the new sandbox.
@@ -370,42 +371,20 @@ async function setupInference(sandboxName, model, provider) {
 
   if (provider === "nvidia-nim") {
     // Create nvidia-nim provider
-    run(
-      `openshell provider create --name nvidia-nim --type openai ` +
-      `--credential "NVIDIA_API_KEY=${process.env.NVIDIA_API_KEY}" ` +
-      `--config "OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1" 2>&1 || true`,
-      { ignoreError: true }
-    );
-    run(
-      `openshell inference set --no-verify --provider nvidia-nim --model ${model} 2>/dev/null || true`,
-      { ignoreError: true }
-    );
+    runArgv("openshell", ["provider", "create", "--name", "nvidia-nim", "--type", "openai",
+      "--credential", `NVIDIA_API_KEY=${process.env.NVIDIA_API_KEY}`,
+      "--config", "OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1"], { ignoreError: true });
+    runArgv("openshell", ["inference", "set", "--no-verify", "--provider", "nvidia-nim", "--model", model], { ignoreError: true });
   } else if (provider === "vllm-local") {
-    run(
-      `openshell provider create --name vllm-local --type openai ` +
-      `--credential "OPENAI_API_KEY=dummy" ` +
-      `--config "OPENAI_BASE_URL=${HOST_GATEWAY_URL}:8000/v1" 2>&1 || ` +
-      `openshell provider update vllm-local --credential "OPENAI_API_KEY=dummy" ` +
-      `--config "OPENAI_BASE_URL=${HOST_GATEWAY_URL}:8000/v1" 2>&1 || true`,
-      { ignoreError: true }
-    );
-    run(
-      `openshell inference set --no-verify --provider vllm-local --model ${model} 2>/dev/null || true`,
-      { ignoreError: true }
-    );
+    runArgv("openshell", ["provider", "create", "--name", "vllm-local", "--type", "openai",
+      "--credential", "OPENAI_API_KEY=dummy",
+      "--config", `OPENAI_BASE_URL=${HOST_GATEWAY_URL}:8000/v1`], { ignoreError: true });
+    runArgv("openshell", ["inference", "set", "--no-verify", "--provider", "vllm-local", "--model", model], { ignoreError: true });
   } else if (provider === "ollama-local") {
-    run(
-      `openshell provider create --name ollama-local --type openai ` +
-      `--credential "OPENAI_API_KEY=ollama" ` +
-      `--config "OPENAI_BASE_URL=${HOST_GATEWAY_URL}:11434/v1" 2>&1 || ` +
-      `openshell provider update ollama-local --credential "OPENAI_API_KEY=ollama" ` +
-      `--config "OPENAI_BASE_URL=${HOST_GATEWAY_URL}:11434/v1" 2>&1 || true`,
-      { ignoreError: true }
-    );
-    run(
-      `openshell inference set --no-verify --provider ollama-local --model ${model} 2>/dev/null || true`,
-      { ignoreError: true }
-    );
+    runArgv("openshell", ["provider", "create", "--name", "ollama-local", "--type", "openai",
+      "--credential", "OPENAI_API_KEY=ollama",
+      "--config", `OPENAI_BASE_URL=${HOST_GATEWAY_URL}:11434/v1`], { ignoreError: true });
+    runArgv("openshell", ["inference", "set", "--no-verify", "--provider", "ollama-local", "--model", model], { ignoreError: true });
   }
 
   registry.updateSandbox(sandboxName, { model, provider });

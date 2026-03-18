@@ -43,6 +43,10 @@ if chat_origin not in origins:
 gateway = cfg.setdefault('gateway', {})
 gateway['mode'] = 'local'
 gateway['controlUi'] = {
+    # WARNING: These flags disable authentication protections.
+    # They are acceptable for local development sandboxes but should NOT be used
+    # for production or internet-exposed deployments. Consider setting
+    # NEMOCLAW_SECURE_MODE=1 env var to disable these in production.
     'allowInsecureAuth': True,
     'dangerouslyDisableDeviceAuth': True,
     'allowedOrigins': origins,

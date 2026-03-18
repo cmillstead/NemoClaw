@@ -9,16 +9,12 @@ import { TranscriptDb } from "./transcript-db.js";
 import { SessionManager } from "./session.js";
 import { DEFAULT_MEMORY_CONFIG } from "./types.js";
 import type { MemoryConfig, SubagentSpawnContext, SubagentEndedContext } from "./types.js";
-import type { PluginLogger } from "../index.js";
 import {
   handlePrepareSubagentSpawn,
   handleSubagentEnded,
   truncateCompactionSummaries,
 } from "./context-hooks.js";
-
-function makeLogger(): PluginLogger {
-  return { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
-}
+import { makeLogger } from "../__test-utils__/logger.js";
 
 describe("context-hooks", () => {
   let tmpDir: string;

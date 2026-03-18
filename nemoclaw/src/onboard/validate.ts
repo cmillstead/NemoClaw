@@ -7,11 +7,50 @@ export interface ValidationResult {
   error: string | null;
 }
 
+const PRIVATE_RANGES = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+  /^::1$/,
+  /^fc00:/,
+  /^fe80:/,
+];
+
+function validateEndpointUrl(endpointUrl: string): { valid: boolean; error?: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(endpointUrl);
+  } catch {
+    return { valid: false, error: "Invalid URL format" };
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return { valid: false, error: "URL must use http or https" };
+  }
+  // Allow localhost for local inference
+  if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+    return { valid: true };
+  }
+  // Block private IP ranges (SSRF protection)
+  for (const range of PRIVATE_RANGES) {
+    if (range.test(parsed.hostname)) {
+      return { valid: false, error: "URL points to a private/internal network address" };
+    }
+  }
+  return { valid: true };
+}
+
 export async function validateApiKey(
   apiKey: string,
   endpointUrl: string,
 ): Promise<ValidationResult> {
-  const url = `${endpointUrl.replace(/\/+$/, "")}/models`;
+  const urlCheck = validateEndpointUrl(endpointUrl);
+  if (!urlCheck.valid) {
+    return { valid: false, models: [], error: urlCheck.error ?? "Invalid endpoint URL" };
+  }
+  const url = new URL("/models", endpointUrl.replace(/\/+$/, "")).toString();
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
@@ -82,7 +121,11 @@ export function validateKeyPrefix(apiKey: string, prefixes: string[] | undefined
 export async function validateEndpointReachable(
   endpointUrl: string,
 ): Promise<{ reachable: boolean; error?: string }> {
-  const url = `${endpointUrl.replace(/\/+$/, "")}/models`;
+  const urlCheck = validateEndpointUrl(endpointUrl);
+  if (!urlCheck.valid) {
+    return { reachable: false, error: urlCheck.error };
+  }
+  const url = new URL("/models", endpointUrl.replace(/\/+$/, "")).toString();
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();

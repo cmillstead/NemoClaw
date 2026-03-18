@@ -7,7 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 
-const { ROOT, SCRIPTS, run, runCapture } = require("./lib/runner");
+const { ROOT, SCRIPTS, run, runCapture, runArgv, runCaptureArgv, validateInstanceName } = require("./lib/runner");
 const {
   ensureApiKey,
   ensureGithubToken,
@@ -44,7 +44,7 @@ async function setup() {
 
 async function setupSpark() {
   await ensureApiKey();
-  run(`sudo -E NVIDIA_API_KEY="${process.env.NVIDIA_API_KEY}" bash "${SCRIPTS}/setup-spark.sh"`);
+  runArgv("sudo", ["-E", "bash", path.join(SCRIPTS, "setup-spark.sh")]);
 }
 
 async function deploy(instanceName) {
@@ -62,6 +62,7 @@ async function deploy(instanceName) {
     await ensureGithubToken();
   }
   const name = instanceName;
+  validateInstanceName(name);
   const gpu = process.env.NEMOCLAW_GPU || "a2-highgpu-1g:nvidia-tesla-a100:1";
 
   console.log("");
@@ -69,7 +70,7 @@ async function deploy(instanceName) {
   console.log("");
 
   try {
-    execSync("which brev", { stdio: "ignore" });
+    require("child_process").execFileSync("which", ["brev"], { stdio: "ignore" });
   } catch {
     console.error("brev CLI not found. Install: https://brev.nvidia.com");
     process.exit(1);
@@ -77,23 +78,23 @@ async function deploy(instanceName) {
 
   let exists = false;
   try {
-    const out = execSync("brev ls 2>&1", { encoding: "utf-8" });
+    const out = require("child_process").execFileSync("brev", ["ls"], { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
     exists = out.includes(name);
   } catch {}
 
   if (!exists) {
     console.log(`  Creating Brev instance '${name}' (${gpu})...`);
-    run(`brev create ${name} --gpu "${gpu}"`);
+    runArgv("brev", ["create", name, "--gpu", gpu]);
   } else {
     console.log(`  Brev instance '${name}' already exists.`);
   }
 
-  run(`brev refresh`, { ignoreError: true });
+  runArgv("brev", ["refresh"], { ignoreError: true });
 
   console.log("  Waiting for SSH...");
   for (let i = 0; i < 60; i++) {
     try {
-      execSync(`ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no ${name} 'echo ok' 2>/dev/null`, { encoding: "utf-8", stdio: "pipe" });
+      require("child_process").execFileSync("ssh", ["-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", "-o", `UserKnownHostsFile=${path.join(os.homedir(), ".nemoclaw", "known_hosts")}`, name, "echo ok"], { encoding: "utf-8", stdio: "pipe" });
       break;
     } catch {
       if (i === 59) {
@@ -105,31 +106,38 @@ async function deploy(instanceName) {
   }
 
   console.log("  Syncing NemoClaw to VM...");
-  run(`ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${name} 'mkdir -p /home/ubuntu/nemoclaw'`);
-  run(`rsync -az --delete --exclude node_modules --exclude .git --exclude src -e "ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR" "${ROOT}/scripts" "${ROOT}/Dockerfile" "${ROOT}/nemoclaw" "${ROOT}/nemoclaw-blueprint" "${ROOT}/bin" "${ROOT}/package.json" ${name}:/home/ubuntu/nemoclaw/`);
+  runArgv("ssh", ["-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "mkdir -p /home/ubuntu/nemoclaw"]);
+  runArgv("rsync", ["-az", "--delete", "--exclude", "node_modules", "--exclude", ".git", "--exclude", "src", "-e", "ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR", path.join(ROOT, "scripts"), path.join(ROOT, "Dockerfile"), path.join(ROOT, "nemoclaw"), path.join(ROOT, "nemoclaw-blueprint"), path.join(ROOT, "bin"), path.join(ROOT, "package.json"), `${name}:/home/ubuntu/nemoclaw/`]);
 
+  const { randomBytes } = require("crypto");
   const envLines = [`NVIDIA_API_KEY=${process.env.NVIDIA_API_KEY}`];
   const ghToken = process.env.GITHUB_TOKEN;
   if (ghToken) envLines.push(`GITHUB_TOKEN=${ghToken}`);
   const tgToken = getCredential("TELEGRAM_BOT_TOKEN");
   if (tgToken) envLines.push(`TELEGRAM_BOT_TOKEN=${tgToken}`);
-  const envTmp = path.join(os.tmpdir(), `nemoclaw-env-${Date.now()}`);
+  const envTmp = path.join(os.tmpdir(), `nemoclaw-env-${randomBytes(8).toString("hex")}`);
   fs.writeFileSync(envTmp, envLines.join("\n") + "\n", { mode: 0o600 });
-  run(`scp -q -o StrictHostKeyChecking=no -o LogLevel=ERROR "${envTmp}" ${name}:/home/ubuntu/nemoclaw/.env`);
-  fs.unlinkSync(envTmp);
+  try {
+    runArgv("scp", ["-q", "-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", envTmp, `${name}:/home/ubuntu/nemoclaw/.env`]);
+  } finally {
+    fs.unlinkSync(envTmp);
+  }
 
   console.log("  Running setup...");
-  run(`ssh -t -o StrictHostKeyChecking=no -o LogLevel=ERROR ${name} 'cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && bash scripts/brev-setup.sh'`);
+  runArgv("ssh", ["-t", "-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && bash scripts/brev-setup.sh"]);
+
+  // Clean up remote .env after sourcing (SEC-DAT-004)
+  runArgv("ssh", ["-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && rm -f .env"]);
 
   if (tgToken) {
     console.log("  Starting services...");
-    run(`ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR ${name} 'cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && bash scripts/start-services.sh'`);
+    runArgv("ssh", ["-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && bash scripts/start-services.sh"]);
   }
 
   console.log("");
   console.log("  Connecting to sandbox...");
   console.log("");
-  run(`ssh -t -o StrictHostKeyChecking=no -o LogLevel=ERROR ${name} 'cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && openshell sandbox connect nemoclaw'`);
+  runArgv("ssh", ["-t", "-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && openshell sandbox connect nemoclaw"]);
 }
 
 async function start() {

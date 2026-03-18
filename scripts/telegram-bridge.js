@@ -13,7 +13,7 @@
  *   TELEGRAM_BOT_TOKEN  — from @BotFather
  *   NVIDIA_API_KEY      — for inference
  *   SANDBOX_NAME        — sandbox name (default: nemoclaw)
- *   ALLOWED_CHAT_IDS    — comma-separated Telegram chat IDs to accept (optional, accepts all if unset)
+ *   ALLOWED_CHAT_IDS    — comma-separated Telegram chat IDs to accept (required)
  */
 
 const https = require("https");
@@ -23,11 +23,16 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const API_KEY = process.env.NVIDIA_API_KEY;
 const SANDBOX = process.env.SANDBOX_NAME || "nemoclaw";
 const ALLOWED_CHATS = process.env.ALLOWED_CHAT_IDS
-  ? process.env.ALLOWED_CHAT_IDS.split(",").map((s) => s.trim())
+  ? process.env.ALLOWED_CHAT_IDS.split(",").map((s) => s.trim()).filter(Boolean)
   : null;
 
 if (!TOKEN) { console.error("TELEGRAM_BOT_TOKEN required"); process.exit(1); }
 if (!API_KEY) { console.error("NVIDIA_API_KEY required"); process.exit(1); }
+if (!ALLOWED_CHATS || ALLOWED_CHATS.length === 0) {
+  console.error("ALLOWED_CHAT_IDS required (comma-separated Telegram chat IDs)");
+  console.error("  Get your chat ID by messaging @userinfobot on Telegram");
+  process.exit(1);
+}
 
 let offset = 0;
 const activeSessions = new Map(); // chatId → message history
@@ -85,18 +90,24 @@ async function sendTyping(chatId) {
 
 function runAgentInSandbox(message, sessionId) {
   return new Promise((resolve) => {
-    const sshConfig = execSync(`openshell sandbox ssh-config ${SANDBOX}`, { encoding: "utf-8" });
+    const sshConfig = require("child_process").execFileSync(
+      "openshell", ["sandbox", "ssh-config", SANDBOX], { encoding: "utf-8" }
+    );
 
     // Write temp ssh config
     const confPath = `/tmp/nemoclaw-tg-ssh-${sessionId}.conf`;
-    require("fs").writeFileSync(confPath, sshConfig);
+    require("fs").writeFileSync(confPath, sshConfig, { mode: 0o600 });
 
-    const escaped = message.replace(/'/g, "'\\''");
-    const cmd = `export NVIDIA_API_KEY='${API_KEY}' && nemoclaw-start openclaw agent --agent main --local -m '${escaped}' --session-id 'tg-${sessionId}'`;
+    // Base64 encode message to eliminate shell injection (SEC-ATK-003)
+    const b64Message = Buffer.from(message).toString("base64");
 
-    const proc = spawn("ssh", ["-T", "-F", confPath, `openshell-${SANDBOX}`, cmd], {
+    // Pass message via base64-encoded stdin; sessionId has quotes stripped as defense-in-depth
+    const cmd = `echo '${b64Message}' | base64 -d | nemoclaw-start openclaw agent --agent main --local --stdin --session-id 'tg-${sessionId.replace(/'/g, "")}'`;
+
+    const proc = require("child_process").spawn("ssh", ["-T", "-F", confPath, `openshell-${SANDBOX}`, cmd], {
       timeout: 120000,
       stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, NVIDIA_API_KEY: API_KEY },
     });
 
     let stdout = "";
@@ -163,7 +174,7 @@ async function poll() {
         }
 
         const userName = msg.from?.first_name || "someone";
-        console.log(`[${chatId}] ${userName}: ${msg.text}`);
+        console.log(`[${chatId}] ${userName}: ${msg.text.slice(0, 50)}${msg.text.length > 50 ? "..." : ""}`);
 
         // Handle /start
         if (msg.text === "/start") {
