@@ -9,11 +9,7 @@ import { TranscriptDb } from "./transcript-db.js";
 import { promoteFactNow, promoteEndOfSession, promoteFromMessages } from "./promotion.js";
 import { DEFAULT_MEMORY_CONFIG } from "./types.js";
 import type { MemoryConfig, MessageRecord } from "./types.js";
-import type { PluginLogger } from "../index.js";
-
-function makeLogger(): PluginLogger {
-  return { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
-}
+import { makeLogger } from "../__test-utils__/logger.js";
 
 describe("promotion", () => {
   let tmpDir: string;

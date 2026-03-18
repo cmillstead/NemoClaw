@@ -107,26 +107,36 @@ export class Orchestrator {
 
   private acquireLock(): boolean {
     const lockPath = join(this.memoryDir, LOCK_FILE);
-
-    if (existsSync(lockPath)) {
-      try {
-        const data: LockData = JSON.parse(readFileSync(lockPath, "utf-8")) as LockData;
-        const lockAge = Date.now() - new Date(data.timestamp).getTime();
-        if (lockAge < STALE_LOCK_MS) {
-          return false;
-        }
-        this.logger.warn(
-          `Force-releasing stale janitor lock (age: ${String(Math.round(lockAge / 1000))}s)`,
-        );
-      } catch {
-        // Corrupt lock file — safe to overwrite
-      }
-    }
-
     const lockData: LockData = {
       pid: process.pid,
       timestamp: new Date().toISOString(),
     };
+
+    try {
+      // Atomic create-and-write: fails with EEXIST if file already exists
+      writeFileSync(lockPath, JSON.stringify(lockData), { flag: "wx" });
+      return true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw err;
+      }
+    }
+
+    // Lock file exists — check if it's stale
+    try {
+      const data: LockData = JSON.parse(readFileSync(lockPath, "utf-8")) as LockData;
+      const lockAge = Date.now() - new Date(data.timestamp).getTime();
+      if (lockAge < STALE_LOCK_MS) {
+        return false;
+      }
+      this.logger.warn(
+        `Force-releasing stale janitor lock (age: ${String(Math.round(lockAge / 1000))}s)`,
+      );
+    } catch {
+      // Corrupt lock file — safe to overwrite
+    }
+
+    // Overwrite stale/corrupt lock
     writeFileSync(lockPath, JSON.stringify(lockData), "utf-8");
     return true;
   }

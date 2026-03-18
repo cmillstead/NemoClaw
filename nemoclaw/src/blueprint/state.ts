@@ -50,7 +50,12 @@ export function loadState(): NemoClawState {
   if (!existsSync(path)) {
     return blankState();
   }
-  return JSON.parse(readFileSync(path, "utf-8")) as NemoClawState;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as NemoClawState;
+  } catch {
+    // Corrupt state — treat as fresh rather than crashing the plugin
+    return blankState();
+  }
 }
 
 export function saveState(state: NemoClawState): void {
