@@ -17,6 +17,7 @@ import { handleSlashCommand } from "./commands/slash.js";
 import { loadOnboardConfig } from "./onboard/config.js";
 import { createMemoryService, getSessionManager, getOrchestrator } from "./memory/service.js";
 import { handleMemorySlashCommand } from "./commands/memory.js";
+import { handleCodeSlashCommand } from "./commands/code.js";
 import { handlePrepareSubagentSpawn, handleSubagentEnded, handleAfterTurn } from "./memory/context-hooks.js";
 import type { SubagentSpawnContext, SubagentEndedContext, AfterTurnContext, SpawnSession, NemoClawOp, ContextEnginePlugin } from "./memory/types.js";
 
@@ -196,6 +197,14 @@ export default function register(api: OpenClawPluginApi): void {
     description: "Memory management (search, remember, facts, status).",
     acceptsArgs: true,
     handler: (ctx) => handleMemorySlashCommand(ctx, api),
+  });
+
+  // 1f. Register /code slash command (Goose-powered)
+  api.registerCommand({
+    name: "code",
+    description: "Dispatch coding tasks to Goose AI agent.",
+    acceptsArgs: true,
+    handler: (ctx) => handleCodeSlashCommand(ctx, api),
   });
 
   // 1d. Bind SpawnSession from the API (if available)
