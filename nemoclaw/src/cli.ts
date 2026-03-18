@@ -16,6 +16,7 @@ import { cliConnect } from "./commands/connect.js";
 import { cliEject } from "./commands/eject.js";
 import { cliLogs } from "./commands/logs.js";
 import { cliOnboard } from "./commands/onboard.js";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync, rmSync, readFileSync, symlinkSync } from "node:fs";
 import { ensureMemoryDirs, updateRootMoc, listFacts, regenerateManifest } from "./memory/para.js";
@@ -228,5 +229,37 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
       }
       regenerateManifest(memoryDir);
       logger.info(`Audit complete: ${String(facts.length)} files scanned, ${String(issues)} issues found.`);
+    });
+
+  // openclaw nemoclaw setup-goose
+  nemoclaw
+    .command("setup-goose")
+    .description("Install or update Goose CLI for code generation")
+    .option("--version <version>", "Goose version to install", "stable")
+    .action((opts: { version: string }) => {
+      const scriptPath = join(
+        __dirname,
+        "..",
+        "..",
+        "nemoclaw-blueprint",
+        "scripts",
+        "install-goose.sh",
+      );
+
+      if (!existsSync(scriptPath)) {
+        logger.error("Install script not found. Ensure NemoClaw blueprint is present.");
+        return;
+      }
+
+      try {
+        const installDir = join(process.env.HOME ?? "/tmp", ".local", "bin");
+        execFileSync("bash", [scriptPath, installDir], {
+          stdio: "inherit",
+          env: { ...process.env, GOOSE_VERSION: opts.version },
+        });
+        logger.info("Goose CLI installed successfully.");
+      } catch (err) {
+        logger.error(`Goose installation failed: ${String(err)}`);
+      }
     });
 }

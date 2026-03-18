@@ -80,6 +80,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: /usr/local/bin/openclaw }
+      - { path: /usr/local/bin/goose }
 
   github:
     name: github
@@ -181,6 +182,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: /usr/local/bin/openclaw }
+      - { path: /usr/local/bin/goose }
 
   # -- Local inference (NIM, vLLM, Ollama)
   # Covers common local endpoints. `openclaw nemoclaw onboard` may generate
@@ -209,3 +211,4 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: /usr/local/bin/openclaw }
+      - { path: /usr/local/bin/goose }
