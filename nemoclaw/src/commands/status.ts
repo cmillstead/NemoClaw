@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { exec } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync as nodeExistsSync } from "node:fs";
 import { promisify } from "node:util";
 import type { PluginLogger, NemoClawConfig } from "../index.js";
-import { loadState } from "../blueprint/state.js";
+import type { NemoClawState } from "../blueprint/state.js";
+import { loadState as loadStateImpl } from "../blueprint/state.js";
 
-const execAsync = promisify(exec);
+const defaultExecAsync = promisify(exec);
 
 /**
  * Detect whether the plugin is running inside an OpenShell sandbox.
@@ -15,25 +16,43 @@ const execAsync = promisify(exec);
  * host commands are not available, so querying `openshell sandbox status`
  * would always fail — producing false-negative "not running" reports.
  */
-function isInsideSandbox(): boolean {
-  return existsSync("/sandbox/.openclaw") || existsSync("/sandbox/.nemoclaw");
+function isInsideSandbox(checkExists: (path: string) => boolean = nodeExistsSync): boolean {
+  return checkExists("/sandbox/.openclaw") || checkExists("/sandbox/.nemoclaw");
 }
+
+/** Injectable dependencies for testing without mocks. */
+export interface StatusDeps {
+  existsSync: (path: string) => boolean;
+  execAsync: (
+    cmd: string,
+    opts: { timeout: number },
+  ) => Promise<{ stdout: string; stderr: string }>;
+  loadState: () => NemoClawState;
+}
+
+const defaultDeps: StatusDeps = {
+  existsSync: nodeExistsSync,
+  execAsync: defaultExecAsync,
+  loadState: loadStateImpl,
+};
 
 export interface StatusOptions {
   json: boolean;
   logger: PluginLogger;
   pluginConfig: NemoClawConfig;
+  deps?: StatusDeps;
 }
 
 export async function cliStatus(opts: StatusOptions): Promise<void> {
   const { json: jsonOutput, logger } = opts;
-  const state = loadState();
+  const deps = opts.deps ?? defaultDeps;
+  const state = deps.loadState();
   const sandboxName = state.sandboxName ?? "openclaw";
-  const insideSandbox = isInsideSandbox();
+  const insideSandbox = isInsideSandbox(deps.existsSync);
 
   const [sandbox, inference] = await Promise.all([
-    getSandboxStatus(sandboxName, insideSandbox),
-    getInferenceStatus(insideSandbox),
+    getSandboxStatus(sandboxName, insideSandbox, deps.execAsync),
+    getInferenceStatus(insideSandbox, deps.execAsync),
   ]);
 
   const statusData = {
@@ -126,12 +145,13 @@ interface SandboxStatusResponse {
 async function getSandboxStatus(
   sandboxName: string,
   insideSandbox: boolean,
+  execFn: StatusDeps["execAsync"] = defaultExecAsync,
 ): Promise<SandboxStatus> {
   if (insideSandbox) {
     return { name: sandboxName, running: false, uptime: null, insideSandbox: true };
   }
   try {
-    const { stdout } = await execAsync(`openshell sandbox status ${sandboxName} --json`, {
+    const { stdout } = await execFn(`openshell sandbox status ${sandboxName} --json`, {
       timeout: 5000,
     });
     const parsed = JSON.parse(stdout) as SandboxStatusResponse;
@@ -160,12 +180,15 @@ interface InferenceStatusResponse {
   endpoint?: string;
 }
 
-async function getInferenceStatus(insideSandbox: boolean): Promise<InferenceStatus> {
+async function getInferenceStatus(
+  insideSandbox: boolean,
+  execFn: StatusDeps["execAsync"] = defaultExecAsync,
+): Promise<InferenceStatus> {
   if (insideSandbox) {
     return { configured: false, provider: null, model: null, endpoint: null, insideSandbox: true };
   }
   try {
-    const { stdout } = await execAsync("openshell inference get --json", {
+    const { stdout } = await execFn("openshell inference get --json", {
       timeout: 5000,
     });
     const parsed = JSON.parse(stdout) as InferenceStatusResponse;

@@ -7,11 +7,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { SpawnSession } from "./types.js";
 import { Orchestrator } from "./orchestrator.js";
-import type { PluginLogger } from "../index.js";
-
-function makeLogger(): PluginLogger {
-  return { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
-}
+import { makeLogger } from "../__test-utils__/logger.js";
 
 // Contract verification: test double satisfies SpawnSession type
 const _spawnContract: SpawnSession = (_opts) => {

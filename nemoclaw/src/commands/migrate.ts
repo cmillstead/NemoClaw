@@ -227,6 +227,9 @@ function syncArchive(
 
 function verifySandboxMigration(bundle: SnapshotBundle, sandboxName: string): void {
   const manifest = loadSnapshotManifest(bundle.snapshotDir);
+  if (!manifest) {
+    throw new Error(`Failed to read snapshot manifest from: ${bundle.snapshotDir}`);
+  }
   const verification = {
     stateDir: "/sandbox/.openclaw",
     configPath: "/sandbox/.openclaw/openclaw.json",

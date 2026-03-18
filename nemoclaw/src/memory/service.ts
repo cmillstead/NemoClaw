@@ -20,19 +20,32 @@ import type { MemoryConfig } from "./types.js";
 import { Orchestrator } from "./orchestrator.js";
 import type { SpawnSession } from "./types.js";
 
-let activeSessionManager: SessionManager | null = null;
-let activeDb: TranscriptDb | null = null;
-let activeOrchestrator: Orchestrator | null = null;
+/**
+ * Holds references to the active memory service components.
+ * Replaces module-level singletons for testability.
+ */
+export class MemoryServiceRegistry {
+  sessionManager: SessionManager | null = null;
+  db: TranscriptDb | null = null;
+  orchestrator: Orchestrator | null = null;
+}
+
+/** Default registry used by the production plugin. */
+const defaultRegistry = new MemoryServiceRegistry();
 
 /**
  * Get the active session manager (for use by commands).
  */
-export function getSessionManager(): SessionManager | null {
-  return activeSessionManager;
+export function getSessionManager(
+  registry: MemoryServiceRegistry = defaultRegistry,
+): SessionManager | null {
+  return registry.sessionManager;
 }
 
-export function getOrchestrator(): Orchestrator | null {
-  return activeOrchestrator;
+export function getOrchestrator(
+  registry: MemoryServiceRegistry = defaultRegistry,
+): Orchestrator | null {
+  return registry.orchestrator;
 }
 
 /**
@@ -55,6 +68,7 @@ function resolveMemoryDir(): string {
 export function createMemoryService(
   _api: OpenClawPluginApi,
   spawner: SpawnSession = null,
+  registry: MemoryServiceRegistry = defaultRegistry,
 ): PluginService {
   return {
     id: "nemoclaw-memory",
@@ -80,12 +94,12 @@ export function createMemoryService(
         const sessionManager = new SessionManager(db, config, logger);
         sessionManager.start();
 
-        activeSessionManager = sessionManager;
-        activeDb = db;
+        registry.sessionManager = sessionManager;
+        registry.db = db;
 
         const orchestrator = new Orchestrator(spawner, memoryDir, logger);
         sessionManager.setOrchestrator(orchestrator);
-        activeOrchestrator = orchestrator;
+        registry.orchestrator = orchestrator;
 
         logger.info(`Memory service started (dir: ${memoryDir})`);
       } catch (err) {
@@ -97,15 +111,15 @@ export function createMemoryService(
       const { logger } = ctx;
 
       try {
-        if (activeSessionManager) {
-          activeSessionManager.close();
-          activeSessionManager = null;
+        if (registry.sessionManager) {
+          registry.sessionManager.close();
+          registry.sessionManager = null;
         }
 
-        if (activeDb) {
-          activeDb.close();
-          activeDb = null;
-          activeOrchestrator = null;
+        if (registry.db) {
+          registry.db.close();
+          registry.db = null;
+          registry.orchestrator = null;
         }
 
         logger.info("Memory service stopped");
