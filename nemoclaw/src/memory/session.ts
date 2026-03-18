@@ -17,12 +17,22 @@ import type { TranscriptDb } from "./transcript-db.js";
 import type { MessageRole, MemoryConfig, MemoryServiceState } from "./types.js";
 import { compact, estimateTokens } from "./compaction.js";
 import { generateSessionId } from "./para.js";
+import type { Orchestrator } from "./orchestrator.js";
 
 export class SessionManager {
   private sessionId: string | null = null;
   private db: TranscriptDb;
   private config: MemoryConfig;
   private logger: PluginLogger;
+  private orchestrator: Orchestrator | null = null;
+
+  setOrchestrator(orchestrator: Orchestrator): void {
+    this.orchestrator = orchestrator;
+  }
+
+  getOrchestrator(): Orchestrator | null {
+    return this.orchestrator;
+  }
 
   constructor(db: TranscriptDb, config: MemoryConfig, logger: PluginLogger) {
     this.db = db;
@@ -74,6 +84,17 @@ export class SessionManager {
   private runCompaction(): boolean {
     if (!this.sessionId) return false;
 
+    // Try async compaction first
+    if (this.orchestrator) {
+      const spawned = this.orchestrator.spawnCompaction(this.sessionId);
+      if (spawned) {
+        this.logger.info(`Async compaction spawned: ${spawned}`);
+        return true;
+      }
+      // Fall through to sync if spawn failed
+    }
+
+    // Synchronous fallback (existing logic)
     this.db.updateSessionStatus(this.sessionId, "compacting");
     this.logger.info(`Compacting session ${this.sessionId}...`);
 
@@ -86,7 +107,6 @@ export class SessionManager {
         return false;
       }
 
-      // Store compaction
       this.db.insertCompaction({
         id: result.id,
         session_id: this.sessionId,
@@ -98,7 +118,6 @@ export class SessionManager {
         created_at: new Date().toISOString(),
       });
 
-      // Mark messages as compacted
       this.db.markMessagesCompacted(this.sessionId, result.id, result.messageRangeEnd);
       this.db.incrementCompactionCount(this.sessionId);
 
@@ -123,7 +142,18 @@ export class SessionManager {
     this.db.updateSessionStatus(this.sessionId, "promoting");
     this.logger.info(`Closing session ${this.sessionId}`);
 
-    // Promotion happens externally (promotion.ts handles end-of-session extraction)
+    // Try async promotion — subagent handles fact extraction independently.
+    if (this.orchestrator) {
+      const spawned = this.orchestrator.spawnPromotion(this.sessionId);
+      if (spawned) {
+        this.logger.info(`Async promotion spawned: ${spawned}`);
+        this.db.closeSession(this.sessionId);
+        this.sessionId = null;
+        return;
+      }
+    }
+
+    // Synchronous fallback
     this.db.closeSession(this.sessionId);
     this.logger.info(`Session closed: ${this.sessionId}`);
     this.sessionId = null;
