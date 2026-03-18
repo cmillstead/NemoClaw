@@ -33,11 +33,24 @@ nemoclaw/
 │   ├── index.ts                    Plugin entry — registers all commands
 │   ├── cli.ts                      Commander.js subcommand wiring
 │   ├── commands/
-│   │   ├── launch.ts               Fresh install into OpenShell
+│   │   ├── code.ts                 /code slash command (Goose-powered)
 │   │   ├── connect.ts              Interactive shell into sandbox
-│   │   ├── status.ts               Blueprint run state + sandbox health
+│   │   ├── launch.ts               Fresh install into OpenShell
 │   │   ├── logs.ts                 Stream blueprint and sandbox logs
-│   │   └── slash.ts                /nemoclaw chat command handler
+│   │   ├── memory.ts               /memory slash command handler
+│   │   ├── onboard.ts              Interactive setup wizard
+│   │   ├── slash.ts                /nemoclaw chat command handler
+│   │   └── status.ts               Blueprint run state + sandbox health
+│   ├── memory/
+│   │   ├── service.ts              Memory background service
+│   │   ├── context-hooks.ts        ContextEngine integration
+│   │   ├── para.ts                 PARA directory structure
+│   │   └── sanitize.ts             Secret and injection scanning
+│   ├── onboard/
+│   │   └── config.ts               Provider configuration persistence
+│   ├── tools/
+│   │   ├── goose.ts                Goose CLI integration (headless)
+│   │   └── goose.test.ts           Tool unit tests
 │   └── blueprint/
 │       ├── resolve.ts              Version resolution, cache management
 │       ├── fetch.ts                Download blueprint from OCI registry
@@ -61,6 +74,8 @@ nemoclaw-blueprint/
 │   └── runner.py                   CLI runner — plan / apply / status
 ├── policies/
 │   └── openclaw-sandbox.yaml       Strict baseline network + filesystem policy
+├── scripts/
+│   └── install-goose.sh            Goose CLI installer (cross-platform)
 ```
 
 ### Blueprint Lifecycle

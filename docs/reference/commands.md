@@ -88,6 +88,42 @@ The `/nemoclaw` slash command is available inside the OpenClaw chat interface fo
 |---|---|
 | `/nemoclaw status` | Show sandbox and inference state |
 
+### `/memory` Slash Command
+
+The `/memory` slash command manages the agent's persistent memory system:
+
+| Subcommand | Description |
+|---|---|
+| `/memory status` | Show memory system health and statistics |
+| `/memory search <query>` | Search across all memory categories |
+| `/memory remember <text>` | Store a new fact |
+| `/memory facts` | List promoted facts |
+
+### `/code` Slash Command
+
+The `/code` slash command dispatches coding tasks to a [Goose](https://github.com/block/goose) AI agent running in headless mode. Goose shares the same inference provider configured during onboard.
+
+```console
+/code <task description>
+/code --session <name> <task>
+/code --resume <name>
+/code --turns <n> <task>
+```
+
+| Option | Description |
+|---|---|
+| `--session <name>` | Use a named Goose session for multi-turn tasks |
+| `--resume <name>` | Resume an existing named session |
+| `--turns <n>` | Max agent turns (default: 25) |
+
+Examples:
+
+```text
+/code write a Python function that validates email addresses
+/code --session auth refactor the JWT middleware
+/code --turns 10 add unit tests for the parser module
+```
+
 ## Standalone Host Commands
 
 The `nemoclaw` binary handles host-side operations that run outside the OpenClaw plugin context.
@@ -103,6 +139,19 @@ $ nemoclaw onboard
 ```
 
 The first run prompts for your NVIDIA API key and saves it to `~/.nemoclaw/credentials.json`.
+
+### `openclaw nemoclaw setup-goose`
+
+Install or update the Goose CLI binary for code generation. This is required before using the `/code` slash command.
+
+```console
+$ openclaw nemoclaw setup-goose [--version <version>]
+```
+
+`--version <version>`
+: Goose release version to install. Default: `stable`.
+
+The binary is installed to `~/.local/bin/goose` on the host or `/usr/local/bin/goose` inside the sandbox.
 
 ### `nemoclaw list`
 

@@ -58,7 +58,7 @@ The following endpoint groups are allowed by default:
 
 * - `nvidia`
   - `integrate.api.nvidia.com:443`, `inference-api.nvidia.com:443`
-  - `/usr/local/bin/claude`, `/usr/local/bin/openclaw`
+  - `/usr/local/bin/claude`, `/usr/local/bin/openclaw`, `/usr/local/bin/goose`
   - All methods
 
 * - `github`
@@ -95,6 +95,16 @@ The following endpoint groups are allowed by default:
   - `api.telegram.org:443`
   - Any binary
   - GET, POST on `/bot*/**`
+
+* - `openrouter`
+  - `openrouter.ai:443`
+  - `/usr/local/bin/claude`, `/usr/local/bin/openclaw`, `/usr/local/bin/goose`
+  - All methods on `/api/**`
+
+* - `local_inference`
+  - `nim-service.local:8000`, `host.openshell.internal:8000`, `host.openshell.internal:11434`
+  - `/usr/local/bin/claude`, `/usr/local/bin/openclaw`, `/usr/local/bin/goose`
+  - All methods
 
 :::
 
