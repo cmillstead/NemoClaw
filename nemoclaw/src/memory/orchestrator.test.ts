@@ -14,8 +14,8 @@ function makeLogger(): PluginLogger {
 }
 
 // Contract verification: test double satisfies SpawnSession type
-const _spawnContract: SpawnSession = (opts) => {
-  return `test-session-${Date.now()}`;
+const _spawnContract: SpawnSession = (_opts) => {
+  return `test-session-${String(Date.now())}`;
 };
 
 describe("orchestrator", () => {

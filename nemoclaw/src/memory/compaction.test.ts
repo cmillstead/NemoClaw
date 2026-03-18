@@ -56,7 +56,11 @@ describe("extractFromMessages", () => {
 
   it("extracts code artifacts (file paths)", () => {
     const messages = [
-      makeMessage(1, "assistant", "Edit the file at src/memory/types.ts and also check /usr/local/bin/node"),
+      makeMessage(
+        1,
+        "assistant",
+        "Edit the file at src/memory/types.ts and also check /usr/local/bin/node",
+      ),
     ];
     const result = extractFromMessages(messages);
     expect(result.codeArtifacts.length).toBeGreaterThanOrEqual(1);
@@ -64,19 +68,14 @@ describe("extractFromMessages", () => {
   });
 
   it("extracts remember requests", () => {
-    const messages = [
-      makeMessage(1, "user", "Remember that I prefer dark mode in VS Code"),
-    ];
+    const messages = [makeMessage(1, "user", "Remember that I prefer dark mode in VS Code")];
     const result = extractFromMessages(messages);
     expect(result.rememberRequests.length).toBeGreaterThanOrEqual(1);
     expect(result.rememberRequests[0]).toContain("dark mode");
   });
 
   it("returns empty arrays for messages with no extractable content", () => {
-    const messages = [
-      makeMessage(1, "user", "ok"),
-      makeMessage(2, "assistant", "ok"),
-    ];
+    const messages = [makeMessage(1, "user", "ok"), makeMessage(2, "assistant", "ok")];
     const result = extractFromMessages(messages);
     expect(result.topics).toHaveLength(1); // "ok" is a topic (short)
     expect(result.decisions).toHaveLength(0);
@@ -98,7 +97,14 @@ describe("compact", () => {
   it("compacts when above threshold, keeping recent 20%", () => {
     const messages: MessageRecord[] = [];
     for (let i = 1; i <= 20; i++) {
-      messages.push(makeMessage(i, i % 2 === 1 ? "user" : "assistant", `Message content number ${i} with some extra words`, 50));
+      messages.push(
+        makeMessage(
+          i,
+          i % 2 === 1 ? "user" : "assistant",
+          `Message content number ${String(i)} with some extra words`,
+          50,
+        ),
+      );
     }
     // Total: 20 * 50 = 1000 tokens, threshold = 500
     const result = compact("sess-001", messages, 500);
@@ -112,7 +118,7 @@ describe("compact", () => {
   it("compaction id follows expected format", () => {
     const messages: MessageRecord[] = [];
     for (let i = 1; i <= 10; i++) {
-      messages.push(makeMessage(i, "user", `Message ${i}`, 100));
+      messages.push(makeMessage(i, "user", `Message ${String(i)}`, 100));
     }
     const result = compact("sess-001", messages, 500);
     expect(result).not.toBeNull();
@@ -150,7 +156,9 @@ describe("compact", () => {
 
 describe("extractKeywords", () => {
   it("extracts meaningful words, excluding stop words", () => {
-    const keywords = extractKeywords("How do I set up a TypeScript project with ESLint and Prettier?");
+    const keywords = extractKeywords(
+      "How do I set up a TypeScript project with ESLint and Prettier?",
+    );
     expect(keywords).toContain("typescript");
     expect(keywords).toContain("eslint");
     expect(keywords).toContain("prettier");

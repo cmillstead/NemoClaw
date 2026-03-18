@@ -153,14 +153,9 @@ describe("PARA file I/O", () => {
 
   describe("parseFact", () => {
     it("parses a written fact file", () => {
-      const result = writeFact(
-        tmpDir,
-        "Parsed fact test",
-        "projects",
-        "sess-001",
-        "agent",
-        ["testing"],
-      );
+      const result = writeFact(tmpDir, "Parsed fact test", "projects", "sess-001", "agent", [
+        "testing",
+      ]);
       const parsed = parseFact(join(tmpDir, result.filePath));
       expect(parsed).not.toBeNull();
       expect(parsed!.id).toBe(result.factId);

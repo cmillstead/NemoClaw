@@ -112,11 +112,12 @@ export function parseGooseOutput(raw: string): GooseResult {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
       success: true,
-      response: typeof parsed.response === "string"
-        ? parsed.response
-        : typeof parsed.content === "string"
-          ? parsed.content
-          : raw,
+      response:
+        typeof parsed.response === "string"
+          ? parsed.response
+          : typeof parsed.content === "string"
+            ? parsed.content
+            : raw,
     };
   } catch {
     // Plain text output — still valid

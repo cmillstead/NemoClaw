@@ -90,7 +90,12 @@ describe("promotion", () => {
     it("respects maxAutoPromotedFacts limit", () => {
       const limitedConfig = { ...config, maxAutoPromotedFacts: 1 };
       for (let i = 0; i < 5; i++) {
-        db.appendMessage("sess-001", "user", `Remember preference number ${i} about color scheme`, 20);
+        db.appendMessage(
+          "sess-001",
+          "user",
+          `Remember preference number ${String(i)} about color scheme`,
+          20,
+        );
         db.appendMessage("sess-001", "assistant", "Noted.", 5);
       }
 
@@ -119,12 +124,7 @@ describe("promotion", () => {
       );
 
       // Same fact should not be auto-promoted
-      db.appendMessage(
-        "sess-001",
-        "user",
-        "Remember that I prefer dark mode in VS Code",
-        20,
-      );
+      db.appendMessage("sess-001", "user", "Remember that I prefer dark mode in VS Code", 20);
       const promoted = promoteEndOfSession(db, config, "sess-001", makeLogger());
       // May or may not match depending on exact extraction; key is no crash
       expect(promoted.length).toBeLessThanOrEqual(config.maxAutoPromotedFacts);
@@ -156,14 +156,7 @@ describe("promotion", () => {
         },
       ];
 
-      const promoted = promoteFromMessages(
-        db,
-        config,
-        "sess-001",
-        messages,
-        "auto",
-        makeLogger(),
-      );
+      const promoted = promoteFromMessages(db, config, "sess-001", messages, "auto", makeLogger());
       expect(promoted.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -181,14 +174,7 @@ describe("promotion", () => {
         },
       ];
 
-      const promoted = promoteFromMessages(
-        db,
-        config,
-        "sess-001",
-        messages,
-        "auto",
-        makeLogger(),
-      );
+      const promoted = promoteFromMessages(db, config, "sess-001", messages, "auto", makeLogger());
       expect(promoted).toHaveLength(0);
     });
   });

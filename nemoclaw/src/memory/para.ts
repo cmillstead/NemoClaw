@@ -67,7 +67,10 @@ export function generateFactId(): string {
  * Generate a unique session ID.
  */
 export function generateSessionId(): string {
-  const ts = new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14);
+  const ts = new Date()
+    .toISOString()
+    .replace(/[-:T.Z]/g, "")
+    .slice(0, 14);
   return `sess-${ts}-${randomBytes(4).toString("hex")}`;
 }
 
@@ -78,7 +81,7 @@ function resolveFilename(categoryDir: string, slug: string): string {
   let filename = `${slug}.md`;
   let counter = 2;
   while (existsSync(join(categoryDir, filename))) {
-    filename = `${slug}-${counter}.md`;
+    filename = `${slug}-${String(counter)}.md`;
     counter++;
   }
   return filename;
@@ -99,7 +102,7 @@ export function writeFact(
   const maxFactSize = 10 * 1024;
   const validation = validateContent(fact, maxFactSize);
   if (!validation.valid) {
-    throw new Error(`Fact validation failed: ${validation.reason}`);
+    throw new Error(`Fact validation failed: ${validation.reason ?? ""}`);
   }
 
   const categoryDir = join(memoryDir, category);
@@ -132,7 +135,7 @@ export function writeFact(
 
   const pathValidation = validatePath(filePath, memoryDir);
   if (!pathValidation.valid) {
-    throw new Error(`Path validation failed: ${pathValidation.reason}`);
+    throw new Error(`Path validation failed: ${pathValidation.reason ?? ""}`);
   }
 
   writeFileSync(filePath, content, "utf-8");
@@ -162,7 +165,7 @@ function formatFactFile(fm: ParaFactFrontmatter, context?: string): string {
     `source_type: ${fm.source_type}`,
     `superseded_by: ${fm.superseded_by ?? "null"}`,
     `supersedes: ${fm.supersedes ?? "null"}`,
-    `access_count: ${fm.access_count}`,
+    `access_count: ${String(fm.access_count)}`,
     `content_hash: ${JSON.stringify(fm.content_hash)}`,
     "---",
     "",
@@ -346,9 +349,5 @@ export function regenerateManifest(memoryDir: string): void {
     manifest[relativePath] = hash;
   }
 
-  writeFileSync(
-    join(memoryDir, "_manifest.json"),
-    JSON.stringify(manifest, null, 2),
-    "utf-8",
-  );
+  writeFileSync(join(memoryDir, "_manifest.json"), JSON.stringify(manifest, null, 2), "utf-8");
 }

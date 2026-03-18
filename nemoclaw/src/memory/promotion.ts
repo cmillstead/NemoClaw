@@ -128,7 +128,7 @@ export function promoteFromMessages(
       });
 
       promoted.push(result.filePath);
-      logger.info(`Promoted fact (${String(source)}): ${result.filePath}`);
+      logger.info(`Promoted fact (${source}): ${result.filePath}`);
     } catch (err) {
       logger.warn(`Failed to promote fact: ${String(err)}`);
     }
@@ -192,11 +192,7 @@ function extractCandidates(messages: MessageRecord[]): PromotionCandidate[] {
 /**
  * Write or update the daily note for today.
  */
-function writeDailyNote(
-  memoryDir: string,
-  sessionId: string,
-  promotedPaths: string[],
-): void {
+function writeDailyNote(memoryDir: string, sessionId: string, promotedPaths: string[]): void {
   try {
     const today = new Date().toISOString().split("T")[0];
     const dailyDir = join(memoryDir, "daily");

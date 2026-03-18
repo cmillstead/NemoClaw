@@ -71,14 +71,13 @@ function isNonInteractive(opts: OnboardOptions): boolean {
 }
 
 function resolveHint(provider: ProviderDefinition, ollamaInstalled: boolean): string {
-  return typeof provider.hint === "function"
-    ? provider.hint({ ollamaInstalled })
-    : provider.hint;
+  return typeof provider.hint === "function" ? provider.hint({ ollamaInstalled }) : provider.hint;
 }
 
-async function promptEndpoint(
-  ollama: { installed: boolean; running: boolean },
-): Promise<EndpointType> {
+async function promptEndpoint(ollama: {
+  installed: boolean;
+  running: boolean;
+}): Promise<EndpointType> {
   const options = PROVIDERS.map((p) => ({
     label: p.label,
     value: p.id,

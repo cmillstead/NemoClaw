@@ -115,7 +115,7 @@ export class TranscriptDb {
   getActiveSessions(): SessionRecord[] {
     return this.db
       .prepare("SELECT * FROM sessions WHERE status = 'active' ORDER BY started_at DESC")
-      .all() as SessionRecord[];
+      .all() as unknown as SessionRecord[];
   }
 
   updateSessionTokens(id: string, totalTokens: number): void {
@@ -148,16 +148,14 @@ export class TranscriptDb {
 
   getActiveMessages(sessionId: string): MessageRecord[] {
     return this.db
-      .prepare(
-        "SELECT * FROM messages WHERE session_id = ? AND compacted = 0 ORDER BY id ASC",
-      )
-      .all(sessionId) as MessageRecord[];
+      .prepare("SELECT * FROM messages WHERE session_id = ? AND compacted = 0 ORDER BY id ASC")
+      .all(sessionId) as unknown as MessageRecord[];
   }
 
   getAllMessages(sessionId: string): MessageRecord[] {
     return this.db
       .prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY id ASC")
-      .all(sessionId) as MessageRecord[];
+      .all(sessionId) as unknown as MessageRecord[];
   }
 
   getMessagesInRange(sessionId: string, startId: number, endId: number): MessageRecord[] {
@@ -165,7 +163,7 @@ export class TranscriptDb {
       .prepare(
         "SELECT * FROM messages WHERE session_id = ? AND id >= ? AND id <= ? ORDER BY id ASC",
       )
-      .all(sessionId, startId, endId) as MessageRecord[];
+      .all(sessionId, startId, endId) as unknown as MessageRecord[];
   }
 
   markMessagesCompacted(sessionId: string, compactionId: string, upToId: number): void {
@@ -219,7 +217,7 @@ export class TranscriptDb {
   getCompactions(sessionId: string): CompactionRecord[] {
     return this.db
       .prepare("SELECT * FROM compactions WHERE session_id = ? ORDER BY created_at ASC")
-      .all(sessionId) as CompactionRecord[];
+      .all(sessionId) as unknown as CompactionRecord[];
   }
 
   // -------------------------------------------------------------------------
@@ -232,7 +230,14 @@ export class TranscriptDb {
         `INSERT INTO promoted_facts (id, session_id, fact_file_path, content_hash, promoted_at, source)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(fact.id, fact.session_id, fact.fact_file_path, fact.content_hash, fact.promoted_at, fact.source);
+      .run(
+        fact.id,
+        fact.session_id,
+        fact.fact_file_path,
+        fact.content_hash,
+        fact.promoted_at,
+        fact.source,
+      );
   }
 
   isFactAlreadyPromoted(contentHash: string): boolean {
@@ -245,15 +250,13 @@ export class TranscriptDb {
   getPromotedFacts(sessionId: string): PromotedFactRecord[] {
     return this.db
       .prepare("SELECT * FROM promoted_facts WHERE session_id = ? ORDER BY promoted_at ASC")
-      .all(sessionId) as PromotedFactRecord[];
+      .all(sessionId) as unknown as PromotedFactRecord[];
   }
 
   getPromotedFactCount(sessionId: string, source?: FactSourceType): number {
     if (source) {
       const row = this.db
-        .prepare(
-          "SELECT COUNT(*) as count FROM promoted_facts WHERE session_id = ? AND source = ?",
-        )
+        .prepare("SELECT COUNT(*) as count FROM promoted_facts WHERE session_id = ? AND source = ?")
         .get(sessionId, source) as { count: number };
       return row.count;
     }
@@ -264,9 +267,9 @@ export class TranscriptDb {
   }
 
   getGlobalPromotedFactCount(): number {
-    const row = this.db
-      .prepare("SELECT COUNT(*) as count FROM promoted_facts")
-      .get() as { count: number };
+    const row = this.db.prepare("SELECT COUNT(*) as count FROM promoted_facts").get() as {
+      count: number;
+    };
     return row.count;
   }
 

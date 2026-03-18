@@ -2,12 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from "vitest";
-import {
-  buildGooseArgs,
-  buildGooseEnv,
-  parseGooseOutput,
-  isGooseInstalled,
-} from "./goose.js";
+import { buildGooseArgs, buildGooseEnv, parseGooseOutput, isGooseInstalled } from "./goose.js";
 
 describe("goose tool", () => {
   describe("buildGooseArgs", () => {

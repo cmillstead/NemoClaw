@@ -167,10 +167,7 @@ describe("validatePath", () => {
   });
 
   it("accepts paths for files that do not exist yet", () => {
-    const result = validatePath(
-      join(tmpBase, "memory", "new-fact.md"),
-      join(tmpBase, "memory"),
-    );
+    const result = validatePath(join(tmpBase, "memory", "new-fact.md"), join(tmpBase, "memory"));
     expect(result.valid).toBe(true);
   });
 });

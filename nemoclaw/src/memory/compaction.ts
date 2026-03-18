@@ -20,20 +20,148 @@ import type { MessageRecord, CompactionExtraction, CompactionResult } from "./ty
 // ---------------------------------------------------------------------------
 
 const STOP_WORDS = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have",
-  "he", "her", "his", "how", "i", "if", "in", "into", "is", "it", "its", "just",
-  "me", "my", "no", "not", "of", "on", "or", "our", "she", "so", "some", "such",
-  "than", "that", "the", "their", "them", "then", "there", "these", "they", "this",
-  "to", "too", "up", "us", "very", "was", "we", "were", "what", "when", "where",
-  "which", "while", "who", "why", "will", "with", "would", "yes", "you", "your",
-  "can", "could", "do", "does", "did", "had", "may", "might", "shall", "should",
-  "about", "after", "again", "all", "also", "am", "any", "because", "been", "before",
-  "being", "between", "both", "but", "came", "come", "each", "even", "few", "get",
-  "got", "here", "him", "however", "know", "let", "like", "look", "make", "many",
-  "more", "most", "much", "must", "new", "now", "off", "ok", "okay", "old", "one",
-  "only", "other", "out", "own", "part", "please", "put", "right", "said", "same",
-  "see", "still", "take", "tell", "think", "those", "through", "two", "under",
-  "upon", "want", "way", "well", "went",
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "for",
+  "from",
+  "has",
+  "have",
+  "he",
+  "her",
+  "his",
+  "how",
+  "i",
+  "if",
+  "in",
+  "into",
+  "is",
+  "it",
+  "its",
+  "just",
+  "me",
+  "my",
+  "no",
+  "not",
+  "of",
+  "on",
+  "or",
+  "our",
+  "she",
+  "so",
+  "some",
+  "such",
+  "than",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "to",
+  "too",
+  "up",
+  "us",
+  "very",
+  "was",
+  "we",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "who",
+  "why",
+  "will",
+  "with",
+  "would",
+  "yes",
+  "you",
+  "your",
+  "can",
+  "could",
+  "do",
+  "does",
+  "did",
+  "had",
+  "may",
+  "might",
+  "shall",
+  "should",
+  "about",
+  "after",
+  "again",
+  "all",
+  "also",
+  "am",
+  "any",
+  "because",
+  "been",
+  "before",
+  "being",
+  "between",
+  "both",
+  "but",
+  "came",
+  "come",
+  "each",
+  "even",
+  "few",
+  "get",
+  "got",
+  "here",
+  "him",
+  "however",
+  "know",
+  "let",
+  "like",
+  "look",
+  "make",
+  "many",
+  "more",
+  "most",
+  "much",
+  "must",
+  "new",
+  "now",
+  "off",
+  "ok",
+  "okay",
+  "old",
+  "one",
+  "only",
+  "other",
+  "out",
+  "own",
+  "part",
+  "please",
+  "put",
+  "right",
+  "said",
+  "same",
+  "see",
+  "still",
+  "take",
+  "tell",
+  "think",
+  "those",
+  "through",
+  "two",
+  "under",
+  "upon",
+  "want",
+  "way",
+  "well",
+  "went",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -77,7 +205,9 @@ function extractCodeArtifacts(content: string): string[] {
   }
 
   // File paths with extensions (relative)
-  const relPathMatches = content.match(/[\w.-]+\/[\w.-]+\.(?:ts|js|py|md|json|yaml|yml|toml|sql)\b/g);
+  const relPathMatches = content.match(
+    /[\w.-]+\/[\w.-]+\.(?:ts|js|py|md|json|yaml|yml|toml|sql)\b/g,
+  );
   if (relPathMatches) {
     for (const p of relPathMatches) artifacts.add(p);
   }
@@ -134,7 +264,10 @@ export function compact(
 ): CompactionResult | null {
   if (messages.length === 0) return null;
 
-  const totalTokens = messages.reduce((sum, m) => sum + (m.token_count ?? estimateTokens(m.content)), 0);
+  const totalTokens = messages.reduce(
+    (sum, m) => sum + (m.token_count ?? estimateTokens(m.content)),
+    0,
+  );
   if (totalTokens < threshold) return null;
 
   // Keep the most recent 20% of messages active
@@ -149,7 +282,10 @@ export function compact(
   // Format as structured summary
   const summary = formatSummary(extraction);
 
-  const compactionId = `comp-${new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`;
+  const compactionId = `comp-${new Date()
+    .toISOString()
+    .replace(/[-:T.Z]/g, "")
+    .slice(0, 14)}-${randomBytes(4).toString("hex")}`;
 
   const originalTokenCount = toCompact.reduce(
     (sum, m) => sum + (m.token_count ?? estimateTokens(m.content)),
@@ -213,9 +349,7 @@ function formatSummary(extraction: CompactionExtraction): string {
   }
 
   if (extraction.rememberRequests.length > 0) {
-    sections.push(
-      "### Remember\n" + extraction.rememberRequests.map((r) => `- ${r}`).join("\n"),
-    );
+    sections.push("### Remember\n" + extraction.rememberRequests.map((r) => `- ${r}`).join("\n"));
   }
 
   if (sections.length === 0) {

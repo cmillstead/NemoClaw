@@ -186,15 +186,17 @@ export interface AfterTurnContext {
  * Bound during plugin registration; null if spawn API is unavailable.
  * When null, all async operations fall back to synchronous execution.
  */
-export type SpawnSession = ((opts: {
-  task: string;
-  mode?: "run" | "session";
-  sandbox?: "inherit" | "require";
-  runTimeoutSeconds?: number;
-  cleanup?: "delete" | "keep";
-  label?: string;
-  metadata?: Record<string, unknown>;
-}) => string) | null;
+export type SpawnSession =
+  | ((opts: {
+      task: string;
+      mode?: "run" | "session";
+      sandbox?: "inherit" | "require";
+      runTimeoutSeconds?: number;
+      cleanup?: "delete" | "keep";
+      label?: string;
+      metadata?: Record<string, unknown>;
+    }) => string)
+  | null;
 
 /** Metadata marker for NemoClaw-spawned internal subagents. */
 export type NemoClawOp = "compact" | "promote" | "janitor";

@@ -86,7 +86,9 @@ export function handlePrepareSubagentSpawn(
     if (parts.length === 0) return null;
 
     const block = `<nemoclaw-context type="subagent-briefing">\n${parts.join("\n\n")}\n</nemoclaw-context>`;
-    logger.info(`Injecting ${String(estimateTokens(block))} tokens of memory context into subagent`);
+    logger.info(
+      `Injecting ${String(estimateTokens(block))} tokens of memory context into subagent`,
+    );
     return block;
   } catch (err) {
     logger.warn(`prepareSubagentSpawn failed gracefully: ${String(err)}`);
@@ -114,19 +116,12 @@ export function handleSubagentEnded(
     // Guard: skip internal maintenance subagents
     const op = ctx.metadata?._nemoclawOp as NemoClawOp | undefined;
     if (op) {
-      logger.info(`Skipping fact capture: internal ${String(op)} subagent`);
+      logger.info(`Skipping fact capture: internal ${op} subagent`);
       return [];
     }
 
     // Capture facts from transcript
-    return promoteFromMessages(
-      db,
-      config,
-      ctx.parentSessionId,
-      ctx.messages,
-      "auto",
-      logger,
-    );
+    return promoteFromMessages(db, config, ctx.parentSessionId, ctx.messages, "auto", logger);
   } catch (err) {
     logger.warn(`onSubagentEnded failed gracefully: ${String(err)}`);
     return [];

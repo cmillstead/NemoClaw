@@ -3,11 +3,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { createServer, type Server } from "node:http";
-import {
-  maskApiKey,
-  validateKeyPrefix,
-  validateEndpointReachable,
-} from "./validate.js";
+import { maskApiKey, validateKeyPrefix, validateEndpointReachable } from "./validate.js";
 
 describe("maskApiKey", () => {
   it("masks nvapi- keys", () => {

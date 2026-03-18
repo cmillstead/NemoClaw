@@ -115,7 +115,10 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
     .command("onboard")
     .description("Interactive setup: configure inference endpoint, credential, and model")
     .option("--api-key <key>", "API key for endpoints that require one (skips prompt)")
-    .option("--endpoint <type>", "Endpoint type: build, ncp, openrouter, nim-local, vllm, ollama, custom")
+    .option(
+      "--endpoint <type>",
+      "Endpoint type: build, ncp, openrouter, nim-local, vllm, ollama, custom",
+    )
     .option("--ncp-partner <name>", "NCP partner name (when endpoint is ncp)")
     .option("--endpoint-url <url>", "Endpoint URL (for ncp, nim-local, ollama, or custom)")
     .option("--model <model>", "Model ID to use")
@@ -228,7 +231,9 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
         }
       }
       regenerateManifest(memoryDir);
-      logger.info(`Audit complete: ${String(facts.length)} files scanned, ${String(issues)} issues found.`);
+      logger.info(
+        `Audit complete: ${String(facts.length)} files scanned, ${String(issues)} issues found.`,
+      );
     });
 
   // openclaw nemoclaw setup-goose
