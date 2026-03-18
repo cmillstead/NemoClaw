@@ -247,18 +247,29 @@ def action_apply(
     progress(85, "Saving run state")
     state_dir = Path.home() / ".nemoclaw" / "state" / "runs" / rid
     state_dir.mkdir(parents=True, exist_ok=True)
-    (state_dir / "plan.json").write_text(
+    os.chmod(state_dir, 0o700)  # SEC-DAT-013: restrict state directory access
+
+    # SEC-DAT-013: Strip credentials before persisting plan to disk
+    safe_inference_cfg = {
+        k: v
+        for k, v in inference_cfg.items()
+        if k not in ("credential_default", "credential", "api_key", "secret")
+    }
+
+    plan_file = state_dir / "plan.json"
+    plan_file.write_text(
         json.dumps(
             {
                 "run_id": rid,
                 "profile": profile,
                 "sandbox_name": sandbox_name,
-                "inference": inference_cfg,
+                "inference": safe_inference_cfg,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
     )
+    os.chmod(plan_file, 0o600)  # SEC-DAT-013: restrict plan file access
 
     progress(100, "Apply complete")
     log(f"Sandbox '{sandbox_name}' is ready.")

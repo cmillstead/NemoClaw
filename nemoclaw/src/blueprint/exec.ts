@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { PluginLogger } from "../index.js";
+import { buildSafeBaseEnv } from "../tools/goose.js";
 
 export type BlueprintAction = "plan" | "apply" | "status" | "rollback";
 
@@ -58,7 +59,7 @@ export async function execBlueprint(
     const proc = spawn("python3", args, {
       cwd: options.blueprintPath,
       env: {
-        ...process.env,
+        ...buildSafeBaseEnv(),
         NEMOCLAW_BLUEPRINT_PATH: options.blueprintPath,
         NEMOCLAW_ACTION: options.action,
       },

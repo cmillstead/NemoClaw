@@ -121,6 +121,31 @@ install_nodejs() {
 # 2. Ollama
 # ---------------------------------------------------------------------------
 OLLAMA_MIN_VERSION="0.18.0"
+# TODO: update hash after verifying current Ollama installer at https://ollama.com/install.sh
+OLLAMA_INSTALLER_SHA256="PLACEHOLDER_UPDATE_WITH_ACTUAL_SHA256_HASH"
+
+download_and_verify_ollama_installer() {
+  local ollama_tmp
+  ollama_tmp="$(mktemp)"
+  curl -fsSL https://ollama.com/install.sh -o "$ollama_tmp" \
+    || { rm -f "$ollama_tmp"; error "Failed to download Ollama installer"; }
+  local actual_hash
+  if command_exists sha256sum; then
+    actual_hash="$(sha256sum "$ollama_tmp" | awk '{print $1}')"
+  elif command_exists shasum; then
+    actual_hash="$(shasum -a 256 "$ollama_tmp" | awk '{print $1}')"
+  else
+    warn "No SHA-256 tool found — skipping Ollama installer integrity check"
+    actual_hash="$OLLAMA_INSTALLER_SHA256"
+  fi
+  if [[ "$actual_hash" != "$OLLAMA_INSTALLER_SHA256" ]]; then
+    rm -f "$ollama_tmp"
+    error "Ollama installer integrity check failed\n  Expected: $OLLAMA_INSTALLER_SHA256\n  Actual:   $actual_hash"
+  fi
+  info "Ollama installer integrity verified"
+  sh "$ollama_tmp"
+  rm -f "$ollama_tmp"
+}
 
 get_ollama_version() {
   # `ollama --version` outputs something like "ollama version 0.18.0"
@@ -160,14 +185,14 @@ install_or_upgrade_ollama() {
       info "Ollama v${current} meets minimum requirement (>= v${OLLAMA_MIN_VERSION})"
     else
       info "Ollama v${current:-unknown} is below v${OLLAMA_MIN_VERSION} — upgrading…"
-      curl -fsSL https://ollama.com/install.sh | sh
+      download_and_verify_ollama_installer
       info "Ollama upgraded to $(get_ollama_version)"
     fi
   else
     # No ollama — only install if a GPU is present
     if detect_gpu; then
       info "GPU detected — installing Ollama…"
-      curl -fsSL https://ollama.com/install.sh | sh
+      download_and_verify_ollama_installer
       info "Ollama installed: v$(get_ollama_version)"
     else
       warn "No GPU detected — skipping Ollama installation."

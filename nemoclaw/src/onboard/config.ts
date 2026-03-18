@@ -31,7 +31,7 @@ let configDirCreated = false;
 function ensureConfigDir(): void {
   if (configDirCreated) return;
   if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+    mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   }
   configDirCreated = true;
 }
@@ -56,7 +56,7 @@ export function loadOnboardConfig(): NemoClawOnboardConfig | null {
 
 export function saveOnboardConfig(config: NemoClawOnboardConfig): void {
   ensureConfigDir();
-  writeFileSync(configPath(), JSON.stringify(config, null, 2));
+  writeFileSync(configPath(), JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
 export function clearOnboardConfig(): void {

@@ -22,7 +22,7 @@ let stateDirCreated = false;
 function ensureStateDir(): void {
   if (stateDirCreated) return;
   if (!existsSync(STATE_DIR)) {
-    mkdirSync(STATE_DIR, { recursive: true });
+    mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
   }
   stateDirCreated = true;
 }
@@ -62,7 +62,7 @@ export function saveState(state: NemoClawState): void {
   ensureStateDir();
   state.updatedAt = new Date().toISOString();
   if (!state.createdAt) state.createdAt = state.updatedAt;
-  writeFileSync(statePath(), JSON.stringify(state, null, 2));
+  writeFileSync(statePath(), JSON.stringify(state, null, 2), { mode: 0o600 });
 }
 
 export function clearState(): void {

@@ -23,6 +23,10 @@ if (!process.env.DOCKER_HOST) {
   }
 }
 
+/**
+ * @deprecated Do NOT call with user-controlled input — spawns a shell via bash -c.
+ * Use {@link runArgv} instead for any command where arguments may contain untrusted data.
+ */
 function run(cmd, opts = {}) {
   const result = spawnSync("bash", ["-c", cmd], {
     stdio: "inherit",
@@ -37,6 +41,10 @@ function run(cmd, opts = {}) {
   return result;
 }
 
+/**
+ * @deprecated Do NOT call with user-controlled input — uses execSync which spawns a shell.
+ * Use {@link runCaptureArgv} instead for any command where arguments may contain untrusted data.
+ */
 function runCapture(cmd, opts = {}) {
   try {
     return execSync(cmd, {

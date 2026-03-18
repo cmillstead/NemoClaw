@@ -9,7 +9,7 @@
  */
 
 import { DatabaseSync } from "node:sqlite";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
   SessionRecord,
@@ -76,10 +76,11 @@ export class TranscriptDb {
   constructor(dbPath: string) {
     const dir = dirname(dbPath);
     if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
     }
 
     this.db = new DatabaseSync(dbPath);
+    chmodSync(dbPath, 0o600);
     this.db.exec("PRAGMA journal_mode = WAL");
     this.db.exec("PRAGMA busy_timeout = 5000");
     this.db.exec("PRAGMA foreign_keys = ON");

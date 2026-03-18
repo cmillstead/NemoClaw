@@ -103,9 +103,9 @@ describe("PARA file I/O", () => {
       const content = readFileSync(fullPath, "utf-8");
       expect(content).toContain("---");
       expect(content).toContain('fact: "User prefers TypeScript over JavaScript"');
-      expect(content).toContain("category: areas");
-      expect(content).toContain("status: active");
-      expect(content).toContain("source_type: user");
+      expect(content).toContain('category: "areas"');
+      expect(content).toContain('status: "active"');
+      expect(content).toContain('source_type: "user"');
       expect(content).toContain("- language-choice");
       expect(content).toContain("> Part of [[_index]]");
     });

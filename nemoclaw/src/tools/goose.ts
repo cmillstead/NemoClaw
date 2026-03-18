@@ -14,6 +14,25 @@ import { scanForSecrets } from "../memory/sanitize.js";
 const DEFAULT_MAX_TURNS = 25;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Allowlist of environment variables safe to pass to subprocesses.
+ * Prevents leaking credentials (NVIDIA_API_KEY, TELEGRAM_BOT_TOKEN, etc.)
+ * to child processes that don't need them. (CHAIN-003)
+ */
+const SAFE_ENV_KEYS = ["PATH", "HOME", "TERM", "SHELL", "USER", "LANG"] as const;
+
+/**
+ * Build a minimal environment from process.env, including only safe keys.
+ */
+export function buildSafeBaseEnv(): Record<string, string> {
+  const safe: Record<string, string> = {};
+  for (const key of SAFE_ENV_KEYS) {
+    const val = process.env[key];
+    if (val) safe[key] = val;
+  }
+  return safe;
+}
+
 export interface GooseRunOptions {
   maxTurns?: number;
   session?: string;
@@ -164,7 +183,7 @@ export function runGoose(
     const output = execFileSync("goose", args, {
       encoding: "utf-8",
       timeout: opts.timeout ?? DEFAULT_TIMEOUT_MS,
-      env: { ...process.env, ...env },
+      env: { ...buildSafeBaseEnv(), ...env },
       maxBuffer: 10 * 1024 * 1024, // 10MB
     });
     return parseGooseOutput(output);

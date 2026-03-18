@@ -7,3 +7,8 @@ __pycache__/
 .DS_Store
 docs/_build/
 docs/plans/
+
+# SEC-ATK-008: Prevent credential leakage via .env files
+.env
+.env.*
+*.env

@@ -1,122 +1,92 @@
 # NemoClaw Security Scan Remediation Plan — 2026-03-17
 
-## Scan Results: 3 CRIT, 10 HIGH, 14 MED, 10 LOW (37 total)
+## Second Pass Results: 0 CRIT, 9 HIGH, 16 MED, 14 LOW (39 total)
+## 4 exploit chains identified
+
+Prior scan (PRs #9-#10): 37 findings, all addressed. This is the second pass.
 
 ---
 
-## Phase 1: Shell Injection Elimination (CRIT — 6 findings)
+## Priority 0 — Fix Immediately (Chains)
 
-### 1.1 Add runArgv to bin/lib/runner.js
-- New function using execFileSync with argv array (no shell)
-- Keep run()/runCapture() but mark deprecated
+### 1. Fix secret redaction gap + DB permissions (CHAIN-001)
+**Findings**: SEC-DAT-011, SEC-DAT-003, SEC-DAT-001, SEC-DAT-002, SEC-DAT-004
+- [ ] Add missing `export` credential pattern to `session.ts:redactSecrets()` and `compaction.ts:redactSecretsInSummary()`
+- [ ] Refactor: extract shared `redactAllSecrets()` function using `SECRET_PATTERNS` from `sanitize.ts`
+- [ ] Add `mode: 0o700` to `mkdirSync` in `transcript-db.ts:79`
+- [ ] Add `chmodSync(dbPath, 0o600)` after `DatabaseSync` construction in `transcript-db.ts`
+- [ ] Add `mode: 0o700` to `mkdirSync` in `config.ts:33`
+- [ ] Add `{ mode: 0o600 }` to `writeFileSync` in `config.ts:59`
+- [ ] Add `{ encoding: "utf-8", mode: 0o600 }` to `writeFileSync` in `promotion.ts:230`
+- [ ] Tests: verify all file/dir permissions; verify `export SECRET=...` is redacted
 
-### 1.2 Migrate bin/nemoclaw.js shell calls
-- setupSpark L47: Use spawnSync with env inheritance (sudo -E already passes env)
-- deploy L86-132: Validate instance name with RFC 1123 regex. Replace all ssh/scp/brev calls with runArgv
-- **SEC-ATK-001, SEC-ATK-005** resolved
+### 2. Implement secure gateway mode (CHAIN-002)
+**Findings**: SEC-ATK-005, SEC-ATK-006
+- [ ] Implement `NEMOCLAW_SECURE_MODE` env var check in `nemoclaw-start.sh`
+- [ ] When secure mode: `allowInsecureAuth: False`, `dangerouslyDisableDeviceAuth: False`
+- [ ] Restrict auto-pair to known client IDs (e.g., `openclaw-control-ui`)
+- [ ] Reduce auto-pair window from 600s to 60s
+- [ ] Consider making secure mode the default (insecure opt-in via `NEMOCLAW_INSECURE_MODE=1`)
 
-### 1.3 Migrate bin/lib/onboard.js shell calls
-- setupInference L373-408: Use execFileSync for openshell calls
-- createSandbox L211: Same pattern
-- **SEC-ATK-002** resolved
-
-### 1.4 Migrate bin/lib/nim.js shell calls
-- All docker commands: use runArgv with argv arrays
-- **SEC-ATK-007** resolved
-
-### 1.5 Fix status.ts and logs.ts in plugin layer
-- Replace promisified exec with execFile
-- **SEC-DEP-010, SEC-DEP-011** resolved
-
----
-
-## Phase 2: Telegram Bridge Hardening (HIGH — 3 findings)
-
-### 2.1 Require ALLOWED_CHAT_IDS
-- Exit with error if unset or empty
-- Log rejected messages with chat ID
-- **SEC-ATK-004** resolved
-
-### 2.2 Eliminate shell interpolation for messages
-- Encode message as base64 before SSH
-- Or write to temp file, SCP, reference by path
-- **SEC-ATK-003** resolved
-
-### 2.3 Remove API key from SSH command string
-- Use SSH SendEnv + remote AcceptEnv, or SCP a temp env file
-- **SEC-DAT-003** resolved
+### 3. Fix environment variable leakage (CHAIN-003 partial)
+**Findings**: SEC-DAT-005, SEC-DAT-006, SEC-DAT-010
+- [ ] `goose.ts:167`: Build minimal env — only `PATH`, `HOME`, `TERM`, `SHELL` + `buildGooseEnv()` vars
+- [ ] `telegram-bridge.js:110`: Build minimal env — only `PATH`, `HOME` + `NVIDIA_API_KEY`
+- [ ] Tests: verify child env does NOT contain `TELEGRAM_BOT_TOKEN`, `GITHUB_TOKEN`, `ALLOWED_CHAT_IDS`
 
 ---
 
-## Phase 3: Credential Exposure (HIGH — 7 findings)
+## Priority 1 — Fix This Sprint
 
-### 3.1 Never pass credentials as CLI arguments
-- All --credential "KEY=value" patterns: write to temp file (mode 0600) and pass via --credential-file, or use env inheritance
-- Affects: onboard.js, setup.sh, runner.py
-- **SEC-DAT-001, SEC-DAT-002, SEC-DAT-005, SEC-DAT-006, SEC-DAT-014, SEC-DAT-018** resolved
+### 4. SSRF hardening (CHAIN-004 partial)
+**Findings**: SEC-ATK-001, SEC-ATK-002
+- [ ] Add `redirect: "manual"` to both `fetch()` calls in `validate.ts`
+- [ ] If redirect received, re-validate target URL against SSRF blocklist
+- [ ] Consider DNS resolution at validation time (resolve hostname, check IP against private ranges)
 
-### 3.2 Fix deploy credential flow
-- Pipe credentials via SSH stdin instead of temp file + SCP
-- Add SSH command to delete .env after services start
-- Use StrictHostKeyChecking=accept-new instead of no
-- **SEC-DAT-004, SEC-ATK-006** resolved
+### 5. Telegram error exposure
+**Findings**: SEC-DAT-008, SEC-DAT-009
+- [ ] `telegram-bridge.js:143`: Send generic error to user, log full stderr server-side
+- [ ] `telegram-bridge.js:212`: Send generic error, log `err.message` + stack server-side
+- [ ] `telegram-bridge.js:177,208`: Log only metadata (chat ID, message length), not content
 
-### 3.3 Sanitize Goose error output
-- Run error messages through scanForSecrets before returning
-- **SEC-DAT-016** resolved
+### 6. Memory prompt injection defense
+**Findings**: SEC-ATK-009
+- [ ] XML-escape `result.path` and `fact` content in `recall.ts:107-108`
+- [ ] Escape `<`, `>`, `&`, `"`, `'` at minimum
 
----
-
-## Phase 4: Memory System Hardening (MED — 5 findings)
-
-### 4.1 Set restrictive file permissions
-- para.ts ensureMemoryDirs: mkdirSync with mode 0o700
-- para.ts writeFact: writeFileSync with mode 0o600
-- **SEC-DAT-012, SEC-DAT-017** resolved
-
-### 4.2 Add secret scanning to transcript storage
-- In session.ts append: run scanForSecrets on content, redact before SQLite insert
-- **SEC-DAT-020** resolved
-
-### 4.3 Add secret scanning to compaction
-- In compaction.ts compact: run scanForSecrets on summary, redact before storage
-- **SEC-DAT-011** resolved
+### 7. CI and supply chain fixes
+**Findings**: SEC-DEP-001, SEC-DEP-006, SEC-DEP-007
+- [ ] Remove `|| true` from `npm audit` in `ci.yml`
+- [ ] Add SHA-256 verification for Ollama installer (match nvm pattern from `install.sh:93-111`)
+- [ ] Add SHA-256 verification for NodeSource installer or switch to official binary distribution
+- [ ] Pin Docker base image by digest in `Dockerfile:5`
 
 ---
 
-## Phase 5: Docker and CI Hardening (MED/HIGH — 4 findings)
+## Priority 2 — Backlog
 
-### 5.1 Fix .dockerignore
-- Add: .env, .env.*, *.env, credentials.json, .nemoclaw/
-- **SEC-DEP-024** resolved
+### 8. Additional supply chain hardening
+**Findings**: SEC-DEP-017, SEC-DEP-018, SEC-DEP-019, SEC-DEP-020
+- [ ] Add checksum verification for OpenShell and Goose binary downloads
+- [ ] Add checksum verification for Cloudflared binary download
+- [ ] Fix `walkthrough.sh:88` — use `tmux set-environment` instead of cmdline interpolation
+- [ ] Pin vllm version in `brev-setup.sh:125`, use virtual environment
 
-### 5.2 Pin Docker base image
-- Change FROM node:22-slim to FROM node:22-slim@sha256:DIGEST
-- Pin pyyaml version in Dockerfile and CI
-- **SEC-DEP-020** resolved
+### 9. Remaining MED findings
+**Findings**: SEC-ATK-007, SEC-ATK-008, SEC-DAT-013
+- [ ] Validate `CHAT_UI_URL` against allowlist of schemes, restrict to localhost by default
+- [ ] Add `.env` and `.env.*` to `.gitignore`
+- [ ] Strip credentials from `inference_cfg` before writing `plan.json`, set file mode 0o600
 
-### 5.3 Pin CI actions to SHA
-- Replace @v4/@v5 tags with full SHA digests
-- Add npm audit --audit-level=high step
-- **SEC-DEP-025** resolved
-
-### 5.4 Document insecure auth flags
-- Add warning to nemoclaw-start.sh for allowInsecureAuth/dangerouslyDisableDeviceAuth
-- Consider NEMOCLAW_SECURE_MODE env var
-- **SEC-DEP-023** resolved
-
----
-
-## Phase 6: Remaining Medium/Low (8 findings)
-
-- SEC-ATK-008: Validate endpoint URLs (scheme, reject private IPs) in validate.ts
-- SEC-ATK-011: Use crypto.randomBytes for temp filenames, wrap in try/finally
-- SEC-ATK-012: Validate preset names match ^[a-z0-9-]+$ in policies.js
-- SEC-DAT-008: Truncate logged Telegram messages to 50 chars
-- SEC-DAT-009: Add .gitignore entry for credentials.json, document keychain migration
-- SEC-DAT-010: Document SQLite encryption path (sqlcipher), set DB dir to 0700
-- SEC-DEP-019: Allowlist env vars for child processes instead of spreading process.env
-- SEC-DEP-012: Replace execSync with shell in onboard.ts with execFileSync
+### 10. LOW findings and defense-in-depth
+- [ ] Switch remaining `run()` calls to `runArgv()` where feasible (SEC-ATK-003, SEC-ATK-012)
+- [ ] Use `execFileSync` in `isRepoPrivate()` (SEC-ATK-004)
+- [ ] Change E2E test SSH to `StrictHostKeyChecking=accept-new` (SEC-ATK-011)
+- [ ] Restrict sandbox policy methods to needed HTTP verbs (SEC-ATK-013)
+- [ ] Reduce `validateKeyPrefix()` exposure to 3 chars (SEC-DAT-012)
+- [ ] Pin Python docs deps in `pyproject.toml` (SEC-DEP-012)
+- [ ] Verify `sphinx-llm` package provenance (SEC-DEP-013)
 
 ---
 
@@ -125,6 +95,6 @@
 Each fix must include a test that:
 1. Attempts the attack scenario described in the finding
 2. Verifies the input is rejected or sanitized
-3. Verifies no shell metacharacters are interpreted
+3. Verifies no secrets/internals are leaked
 
-Priority: Phases 1-3 (CRIT+HIGH) should be completed first as a single PR.
+Priority: P0 items (Phases 1-3) should be completed first as a single PR.

@@ -11,6 +11,7 @@ import {
   validateContent,
   validatePath,
   slugify,
+  redactAllSecrets,
 } from "./sanitize.js";
 
 describe("scanForSecrets", () => {
@@ -57,6 +58,106 @@ describe("scanForSecrets", () => {
   it("allows short strings that look like key prefixes", () => {
     const result = scanForSecrets("Use the sk- prefix");
     expect(result.valid).toBe(true);
+  });
+});
+
+describe("redactAllSecrets", () => {
+  it("returns text unchanged when no secrets present", () => {
+    const input = "User prefers TypeScript over JavaScript.";
+    expect(redactAllSecrets(input)).toBe(input);
+  });
+
+  it("redacts OpenAI API keys", () => {
+    const result = redactAllSecrets("key: sk-abc123def456ghi789jkl012mno");
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("sk-abc123");
+  });
+
+  it("redacts NVIDIA API keys", () => {
+    const result = redactAllSecrets("nvapi-abcdefghij1234567890abcdef");
+    expect(result).toBe("[REDACTED]");
+  });
+
+  it("redacts GitHub PATs", () => {
+    const result = redactAllSecrets("token: ghp_abcdefghijklmnopqrstuvwxyz1234567890");
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("ghp_");
+  });
+
+  it("redacts AWS access keys", () => {
+    const result = redactAllSecrets("aws key AKIAIOSFODNN7EXAMPLE");
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("AKIA");
+  });
+
+  it("redacts exported credentials (the 12th pattern)", () => {
+    const result = redactAllSecrets("export SECRET_KEY=abcdef1234567890abcdef");
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("abcdef1234567890abcdef");
+  });
+
+  it("redacts export with quoted value", () => {
+    const result = redactAllSecrets('export API_TOKEN="longSecretValue1234567890abc"');
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("longSecretValue");
+  });
+
+  it("redacts multiple secrets in one string", () => {
+    const input = "key1=sk-abc123def456ghi789jkl012mno and key2=nvapi-abcdefghij1234567890abcdef";
+    const result = redactAllSecrets(input);
+    expect(result).not.toContain("sk-abc123");
+    expect(result).not.toContain("nvapi-");
+    expect(result.match(/\[REDACTED\]/g)!.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("redacts private keys (full block)", () => {
+    const result = redactAllSecrets(
+      "before -----BEGIN RSA PRIVATE KEY-----\nMIIEpAI...\n-----END RSA PRIVATE KEY----- after",
+    );
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("MIIEpAI");
+    expect(result).toContain("before");
+    expect(result).toContain("after");
+  });
+
+  it("redacts Google API keys", () => {
+    // AIza + exactly 35 chars
+    const result = redactAllSecrets("AIzaSyA1234567890abcdefghijklmnopqrstuv");
+    expect(result).toBe("[REDACTED]");
+  });
+
+  it("redacts Slack tokens", () => {
+    const result = redactAllSecrets("xoxb-12345678901234567890-abcdef");
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("xoxb-");
+  });
+
+  it("covers all SECRET_PATTERNS from scanForSecrets", () => {
+    // Every string that scanForSecrets rejects should be redacted by redactAllSecrets
+    const secrets = [
+      "sk-abc123def456ghi789jkl012mno",
+      "sk-or-abc123def456ghi789jkl012mno",
+      "nvapi-abcdefghij1234567890abcdef",
+      "ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+      "ghs_abcdefghijklmnopqrstuvwxyz1234567890",
+      "glpat-abcdefghij1234567890abcdef",
+      "xoxb-12345678901234567890-abcdef",
+      "xoxp-12345678901234567890-abcdef",
+      "-----BEGIN RSA PRIVATE KEY-----\ndata\n-----END RSA PRIVATE KEY-----",
+      "AKIAIOSFODNN7EXAMPLE",
+      "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+      "export MY_SECRET=abcdef1234567890abcdef",
+    ];
+
+    for (const secret of secrets) {
+      const scanResult = scanForSecrets(secret);
+      expect(scanResult.valid).toBe(false);
+
+      const redacted = redactAllSecrets(secret);
+      expect(redacted).toContain("[REDACTED]");
+      // The redacted output should not itself trigger scanForSecrets
+      // (unless [REDACTED] somehow matches, which it shouldn't)
+    }
   });
 });
 

@@ -19,19 +19,75 @@ import type { SanitizeResult } from "./types.js";
 // Secret patterns
 // ---------------------------------------------------------------------------
 
-const SECRET_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
-  { pattern: /\bsk-[a-zA-Z0-9]{20,}\b/, label: "OpenAI API key" },
-  { pattern: /\bsk-or-[a-zA-Z0-9]{20,}\b/, label: "OpenRouter API key" },
-  { pattern: /\bnvapi-[a-zA-Z0-9]{20,}\b/, label: "NVIDIA API key" },
-  { pattern: /\bghp_[a-zA-Z0-9]{36,}\b/, label: "GitHub PAT" },
-  { pattern: /\bghs_[a-zA-Z0-9]{36,}\b/, label: "GitHub App token" },
-  { pattern: /\bglpat-[a-zA-Z0-9]{20,}\b/, label: "GitLab PAT" },
-  { pattern: /\bxoxb-[a-zA-Z0-9-]{20,}\b/, label: "Slack bot token" },
-  { pattern: /\bxoxp-[a-zA-Z0-9-]{20,}\b/, label: "Slack user token" },
-  { pattern: /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/, label: "Private key" },
-  { pattern: /\bAKIA[0-9A-Z]{16}\b/, label: "AWS access key" },
-  { pattern: /\bAIza[0-9A-Za-z_-]{35}\b/, label: "Google API key" },
-  { pattern: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/, label: "Exported credential" },
+const SECRET_PATTERNS: readonly { pattern: RegExp; redact: RegExp; label: string }[] = [
+  {
+    pattern: /\bsk-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bsk-[a-zA-Z0-9]{20,}\b/g,
+    label: "OpenAI API key",
+  },
+  {
+    pattern: /\bsk-or-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bsk-or-[a-zA-Z0-9]{20,}\b/g,
+    label: "OpenRouter API key",
+  },
+  {
+    pattern: /\bnvapi-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bnvapi-[a-zA-Z0-9]{20,}\b/g,
+    label: "NVIDIA API key",
+  },
+  { pattern: /\bghp_[a-zA-Z0-9]{36,}\b/, redact: /\bghp_[a-zA-Z0-9]{36,}\b/g, label: "GitHub PAT" },
+  {
+    pattern: /\bghs_[a-zA-Z0-9]{36,}\b/,
+    redact: /\bghs_[a-zA-Z0-9]{36,}\b/g,
+    label: "GitHub App token",
+  },
+  {
+    pattern: /\bglpat-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bglpat-[a-zA-Z0-9]{20,}\b/g,
+    label: "GitLab PAT",
+  },
+  {
+    pattern: /\bxoxb-[a-zA-Z0-9-]{20,}\b/,
+    redact: /\bxoxb-[a-zA-Z0-9-]{20,}\b/g,
+    label: "Slack bot token",
+  },
+  {
+    pattern: /\bxoxp-[a-zA-Z0-9-]{20,}\b/,
+    redact: /\bxoxp-[a-zA-Z0-9-]{20,}\b/g,
+    label: "Slack user token",
+  },
+  {
+    pattern: /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/,
+    redact:
+      /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+    label: "Private key",
+  },
+  { pattern: /\bAKIA[0-9A-Z]{16}\b/, redact: /\bAKIA[0-9A-Z]{16}\b/g, label: "AWS access key" },
+  {
+    pattern: /\bAIza[0-9A-Za-z_-]{35}\b/,
+    redact: /\bAIza[0-9A-Za-z_-]{35}\b/g,
+    label: "Google API key",
+  },
+  {
+    pattern: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/,
+    redact: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/g,
+    label: "Anthropic API key",
+  },
+  {
+    pattern: /\bhf_[a-zA-Z0-9]{20,}\b/,
+    redact: /\bhf_[a-zA-Z0-9]{20,}\b/g,
+    label: "Hugging Face token",
+  },
+  {
+    pattern: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/,
+    redact: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/g,
+    label: "Telegram bot token",
+  },
+  {
+    pattern: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/,
+    redact: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/g,
+    label: "Exported credential",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -57,6 +113,9 @@ const INJECTION_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
  * Scan content for secrets. Returns invalid result if any secret pattern matches.
  */
 export function scanForSecrets(content: string): SanitizeResult {
+  if (content.length > 1_048_576) {
+    content = content.slice(0, 1_048_576);
+  }
   for (const { pattern, label } of SECRET_PATTERNS) {
     if (pattern.test(content)) {
       return { valid: false, reason: `Content contains potential ${label}` };
@@ -120,6 +179,20 @@ export function validatePath(filePath: string, baseDir: string): SanitizeResult 
   } catch (err) {
     return { valid: false, reason: `Path validation error: ${String(err)}` };
   }
+}
+
+/**
+ * Replace all detected secrets with [REDACTED].
+ * Single source of truth for secret redaction — used by session.ts and compaction.ts.
+ */
+export function redactAllSecrets(text: string): string {
+  const result = scanForSecrets(text);
+  if (result.valid) return text; // No secrets found
+  let redacted = text;
+  for (const { redact } of SECRET_PATTERNS) {
+    redacted = redacted.replace(redact, "[REDACTED]");
+  }
+  return redacted;
 }
 
 /**

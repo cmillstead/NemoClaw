@@ -6,14 +6,16 @@
 # gateway inside the sandbox so the forwarded host port has a live upstream.
 #
 # Optional env:
-#   NVIDIA_API_KEY   API key for NVIDIA-hosted inference
-#   CHAT_UI_URL      Browser origin that will access the forwarded dashboard
+#   NVIDIA_API_KEY        API key for NVIDIA-hosted inference
+#   CHAT_UI_URL           Browser origin that will access the forwarded dashboard
+#   NEMOCLAW_SECURE_MODE  Set to "1" for production: disables insecure auth and auto-pair
 
 set -euo pipefail
 
 NEMOCLAW_CMD=("$@")
 CHAT_UI_URL="${CHAT_UI_URL:-http://127.0.0.1:18789}"
 PUBLIC_PORT=18789
+NEMOCLAW_SECURE_MODE="${NEMOCLAW_SECURE_MODE:-0}"
 
 fix_openclaw_config() {
   python3 - <<'PYCFG'
@@ -34,6 +36,17 @@ cfg.setdefault('agents', {}).setdefault('defaults', {}).setdefault('model', {})[
 
 chat_ui_url = os.environ.get('CHAT_UI_URL', 'http://127.0.0.1:18789')
 parsed = urlparse(chat_ui_url)
+
+# SEC-ATK-007: Only allow http/https schemes to prevent javascript: or data: injection
+if parsed.scheme not in ('http', 'https'):
+    print(f'ERROR: CHAT_UI_URL has invalid scheme "{parsed.scheme}". Only http:// and https:// are allowed.')
+    chat_ui_url = 'http://127.0.0.1:18789'
+    parsed = urlparse(chat_ui_url)
+
+# Warn if a non-localhost origin is configured (potential open CORS)
+if parsed.hostname and parsed.hostname not in ('127.0.0.1', 'localhost', '::1'):
+    print(f'WARNING: CHAT_UI_URL uses non-localhost origin "{parsed.hostname}". Ensure this is intentional.')
+
 chat_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else 'http://127.0.0.1:18789'
 local_origin = f'http://127.0.0.1:{os.environ.get("PUBLIC_PORT", "18789")}'
 origins = [local_origin]
@@ -42,15 +55,25 @@ if chat_origin not in origins:
 
 gateway = cfg.setdefault('gateway', {})
 gateway['mode'] = 'local'
-gateway['controlUi'] = {
-    # WARNING: These flags disable authentication protections.
-    # They are acceptable for local development sandboxes but should NOT be used
-    # for production or internet-exposed deployments. Consider setting
-    # NEMOCLAW_SECURE_MODE=1 env var to disable these in production.
-    'allowInsecureAuth': True,
-    'dangerouslyDisableDeviceAuth': True,
-    'allowedOrigins': origins,
-}
+
+secure_mode = os.environ.get('NEMOCLAW_SECURE_MODE', '0') == '1'
+if secure_mode:
+    # Production mode: enforce authentication protections (CHAIN-002 fix)
+    gateway['controlUi'] = {
+        'allowInsecureAuth': False,
+        'dangerouslyDisableDeviceAuth': False,
+        'allowedOrigins': origins,
+    }
+else:
+    # Development mode: disable auth for local sandboxes.
+    # Set NEMOCLAW_SECURE_MODE=1 for production or internet-exposed deployments.
+    gateway['controlUi'] = {
+        'allowInsecureAuth': True,
+        'dangerouslyDisableDeviceAuth': True,
+        'allowedOrigins': origins,
+    }
+    print('WARNING: Running with insecure auth (set NEMOCLAW_SECURE_MODE=1 for production)')
+
 gateway['trustedProxies'] = ['127.0.0.1', '::1']
 
 with open(config_path, 'w') as f:
@@ -110,12 +133,17 @@ PYTOKEN
 }
 
 start_auto_pair() {
+  if [ "$NEMOCLAW_SECURE_MODE" = "1" ]; then
+    echo "[gateway] Secure mode: auto-pair disabled"
+    return
+  fi
+
   nohup python3 - <<'PYAUTOPAIR' >> /tmp/gateway.log 2>&1 &
 import json
 import subprocess
 import time
 
-DEADLINE = time.time() + 600
+DEADLINE = time.time() + 60
 QUIET_POLLS = 0
 APPROVED = 0
 
@@ -174,7 +202,7 @@ echo 'Setting up NemoClaw...'
 openclaw doctor --fix > /dev/null 2>&1 || true
 openclaw models set nvidia/nemotron-3-super-120b-a12b > /dev/null 2>&1 || true
 write_auth_profile
-export CHAT_UI_URL PUBLIC_PORT
+export CHAT_UI_URL PUBLIC_PORT NEMOCLAW_SECURE_MODE
 fix_openclaw_config
 openclaw plugins install /opt/nemoclaw > /dev/null 2>&1 || true
 

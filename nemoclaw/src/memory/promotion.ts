@@ -196,7 +196,7 @@ function writeDailyNote(memoryDir: string, sessionId: string, promotedPaths: str
   try {
     const today = new Date().toISOString().split("T")[0];
     const dailyDir = join(memoryDir, "daily");
-    mkdirSync(dailyDir, { recursive: true });
+    mkdirSync(dailyDir, { recursive: true, mode: 0o700 });
     const dailyPath = join(dailyDir, `${today}.md`);
 
     let content: string;
@@ -227,7 +227,7 @@ function writeDailyNote(memoryDir: string, sessionId: string, promotedPaths: str
       content = lines.join("\n");
     }
 
-    writeFileSync(dailyPath, content, "utf-8");
+    writeFileSync(dailyPath, content, { encoding: "utf-8", mode: 0o600 });
   } catch {
     // Non-fatal -- daily notes are a convenience feature
   }
