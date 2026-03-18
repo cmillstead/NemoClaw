@@ -17,33 +17,10 @@ import type { TranscriptDb } from "./transcript-db.js";
 import type { MessageRole, MemoryConfig, MemoryServiceState } from "./types.js";
 import { compact, estimateTokens } from "./compaction.js";
 import { generateSessionId } from "./para.js";
-import { scanForSecrets } from "./sanitize.js";
+import { redactAllSecrets } from "./sanitize.js";
 import type { Orchestrator } from "./orchestrator.js";
 
-/**
- * Replace detected secrets with [REDACTED] in text.
- * Used to scrub sensitive data before persistent storage.
- */
-function redactSecrets(text: string): string {
-  const result = scanForSecrets(text);
-  if (result.valid) return text; // No secrets found
-  // Re-run patterns and redact each match
-  return text
-    .replace(/\bsk-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bsk-or-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bnvapi-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bghp_[a-zA-Z0-9]{36,}\b/g, "[REDACTED]")
-    .replace(/\bghs_[a-zA-Z0-9]{36,}\b/g, "[REDACTED]")
-    .replace(/\bglpat-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bxoxb-[a-zA-Z0-9-]{20,}\b/g, "[REDACTED]")
-    .replace(/\bxoxp-[a-zA-Z0-9-]{20,}\b/g, "[REDACTED]")
-    .replace(
-      /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END \1?PRIVATE KEY-----/g,
-      "[REDACTED]",
-    )
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]")
-    .replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, "[REDACTED]");
-}
+// Secret redaction now uses shared redactAllSecrets from sanitize.ts
 
 export class SessionManager {
   private sessionId: string | null = null;
@@ -90,7 +67,7 @@ export class SessionManager {
     }
 
     // Redact secrets before persistent storage (SEC-DAT-020)
-    const redacted = redactSecrets(content);
+    const redacted = redactAllSecrets(content);
     const tokenCount = estimateTokens(redacted);
     this.db.appendMessage(this.sessionId, role, redacted, tokenCount);
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from "vitest";
-import { buildGooseArgs, buildGooseEnv, parseGooseOutput, isGooseInstalled } from "./goose.js";
+import { buildGooseArgs, buildGooseEnv, buildSafeBaseEnv, parseGooseOutput, isGooseInstalled } from "./goose.js";
 
 describe("goose tool", () => {
   describe("buildGooseArgs", () => {
@@ -108,6 +108,89 @@ describe("goose tool", () => {
       const result = parseGooseOutput("");
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
+    });
+  });
+
+  describe("buildSafeBaseEnv (CHAIN-003)", () => {
+    it("includes only allowlisted keys from process.env", () => {
+      const env = buildSafeBaseEnv();
+      const allowedKeys = new Set(["PATH", "HOME", "TERM", "SHELL", "USER", "LANG"]);
+
+      for (const key of Object.keys(env)) {
+        expect(allowedKeys.has(key)).toBe(true);
+      }
+    });
+
+    it("includes PATH when present in process.env", () => {
+      // PATH is virtually always set
+      const env = buildSafeBaseEnv();
+      if (process.env.PATH) {
+        expect(env.PATH).toBe(process.env.PATH);
+      }
+    });
+
+    it("does NOT leak sensitive environment variables", () => {
+      // Temporarily set sensitive vars to verify they are excluded
+      const sensitiveKeys = [
+        "NVIDIA_API_KEY",
+        "TELEGRAM_BOT_TOKEN",
+        "GITHUB_TOKEN",
+        "ALLOWED_CHAT_IDS",
+        "AWS_SECRET_ACCESS_KEY",
+        "OPENAI_API_KEY",
+      ];
+
+      const saved: Record<string, string | undefined> = {};
+      for (const key of sensitiveKeys) {
+        saved[key] = process.env[key];
+        process.env[key] = "test-secret-value";
+      }
+
+      try {
+        const env = buildSafeBaseEnv();
+        for (const key of sensitiveKeys) {
+          expect(env).not.toHaveProperty(key);
+        }
+      } finally {
+        // Restore original values
+        for (const key of sensitiveKeys) {
+          if (saved[key] === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = saved[key];
+          }
+        }
+      }
+    });
+
+    it("merged with buildGooseEnv passes only Goose-specific + safe vars", () => {
+      // Simulate what runGoose does: { ...buildSafeBaseEnv(), ...buildGooseEnv(config) }
+      const saved = process.env.TELEGRAM_BOT_TOKEN;
+      process.env.TELEGRAM_BOT_TOKEN = "leaked-token";
+
+      try {
+        const base = buildSafeBaseEnv();
+        const gooseEnv = buildGooseEnv({
+          provider: "openai",
+          apiKey: "nvapi-test",
+          model: "test-model",
+        });
+        const merged = { ...base, ...gooseEnv };
+
+        // Should have Goose vars
+        expect(merged.OPENAI_API_KEY).toBe("nvapi-test");
+        expect(merged.GOOSE_MODE).toBe("auto");
+
+        // Should NOT have leaked credentials
+        expect(merged).not.toHaveProperty("TELEGRAM_BOT_TOKEN");
+        expect(merged).not.toHaveProperty("GITHUB_TOKEN");
+      } finally {
+        if (saved === undefined) {
+          delete process.env.TELEGRAM_BOT_TOKEN;
+        } else {
+          process.env.TELEGRAM_BOT_TOKEN = saved;
+        }
+      }
     });
   });
 

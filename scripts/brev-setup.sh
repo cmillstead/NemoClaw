@@ -36,7 +36,13 @@ export DEBIAN_FRONTEND=noninteractive
 # --- 0. Node.js (needed for services) ---
 if ! command -v node > /dev/null 2>&1; then
   info "Installing Node.js..."
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - > /dev/null 2>&1
+  # SEC-DEP-007: Download installer to temp file before executing (no piping to sh)
+  local nodesource_tmp
+  nodesource_tmp="$(mktemp)"
+  curl -fsSL https://deb.nodesource.com/setup_22.x -o "$nodesource_tmp" \
+    || { rm -f "$nodesource_tmp"; fail "Failed to download NodeSource installer"; }
+  sudo -E bash "$nodesource_tmp" > /dev/null 2>&1
+  rm -f "$nodesource_tmp"
   sudo apt-get install -y -qq nodejs > /dev/null 2>&1
   info "Node.js $(node --version) installed"
 else
@@ -106,9 +112,34 @@ if ! command -v cloudflared > /dev/null 2>&1; then
     aarch64|arm64) CF_ARCH="arm64" ;;
     *) fail "Unsupported architecture for cloudflared: $CF_ARCH" ;;
   esac
-  curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -o /tmp/cloudflared
-  sudo install -m 755 /tmp/cloudflared /usr/local/bin/cloudflared
-  rm -f /tmp/cloudflared
+  local cf_tmp
+  cf_tmp="$(mktemp)"
+  curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -o "$cf_tmp"
+  # SEC-DEP-018: Verify cloudflared binary integrity via checksums
+  local cf_checksums_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}.sha256"
+  if curl -fsSL "$cf_checksums_url" -o "${cf_tmp}.sha256" 2>/dev/null; then
+    local cf_expected cf_actual
+    cf_expected="$(awk '{print $1}' "${cf_tmp}.sha256")"
+    if command -v sha256sum > /dev/null 2>&1; then
+      cf_actual="$(sha256sum "$cf_tmp" | awk '{print $1}')"
+    elif command -v shasum > /dev/null 2>&1; then
+      cf_actual="$(shasum -a 256 "$cf_tmp" | awk '{print $1}')"
+    else
+      warn "No SHA-256 tool found — skipping cloudflared integrity check"
+      cf_actual="$cf_expected"
+    fi
+    if [ "$cf_actual" != "$cf_expected" ]; then
+      rm -f "$cf_tmp" "${cf_tmp}.sha256"
+      fail "cloudflared integrity check failed (expected: $cf_expected, actual: $cf_actual)"
+    fi
+    info "cloudflared integrity verified"
+    rm -f "${cf_tmp}.sha256"
+  else
+    warn "Checksums file not available — skipping cloudflared integrity verification"
+    warn "  TODO: Pin a known-good SHA-256 hash for the release asset"
+  fi
+  sudo install -m 755 "$cf_tmp" /usr/local/bin/cloudflared
+  rm -f "$cf_tmp"
   info "cloudflared $(cloudflared --version 2>&1 | head -1) installed"
 else
   info "cloudflared already installed"
@@ -122,7 +153,9 @@ if command -v nvidia-smi > /dev/null 2>&1; then
     if ! command -v pip3 > /dev/null 2>&1; then
       sudo apt-get install -y -qq python3-pip > /dev/null 2>&1
     fi
-    pip3 install --break-system-packages vllm 2>/dev/null || pip3 install vllm
+    # SEC-DEP-020: Pin vllm to a specific version for reproducibility
+    pip3 install --no-cache-dir --break-system-packages vllm==0.7.3 2>/dev/null \
+      || pip3 install --no-cache-dir vllm==0.7.3
     info "vLLM installed"
   else
     info "vLLM already installed"

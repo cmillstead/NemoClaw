@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
@@ -84,5 +84,12 @@ describe("onboard config", () => {
 
     const loaded = loadOnboardConfig();
     expect(loaded).toBeNull();
+  });
+
+  it("saves config file with mode 0o600", () => {
+    saveOnboardConfig(makeConfig());
+    const stat = statSync(CONFIG_PATH);
+    const mode = stat.mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 });

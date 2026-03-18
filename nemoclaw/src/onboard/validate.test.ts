@@ -82,6 +82,24 @@ describe("validateEndpointReachable", () => {
     expect(result.reachable).toBe(true);
   });
 
+  it("returns reachable: false when server redirects (SSRF protection)", async () => {
+    // Start a server that returns a 302 redirect
+    server = createServer((_req, res) => {
+      res.writeHead(302, { Location: "http://169.254.169.254/latest/meta-data/" });
+      res.end();
+    });
+    const port = await new Promise<number>((resolve) => {
+      server!.listen(0, () => {
+        const addr = server!.address();
+        const p = typeof addr === "object" && addr ? addr.port : 0;
+        resolve(p);
+      });
+    });
+    const result = await validateEndpointReachable(`http://localhost:${String(port)}/v1`);
+    expect(result.reachable).toBe(false);
+    expect(result.error).toContain("redirect");
+  });
+
   it("returns reachable: false for unreachable endpoint", async () => {
     const result = await validateEndpointReachable("http://localhost:19999/v1");
     expect(result.reachable).toBe(false);

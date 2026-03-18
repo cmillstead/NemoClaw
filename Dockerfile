@@ -2,7 +2,7 @@
 
 # Pin to specific digest for reproducible builds (SEC-DEP-020)
 # Update digest periodically: docker pull node:22-slim && docker inspect --format='{{index .RepoDigests 0}}' node:22-slim
-FROM node:22-slim
+FROM node:22-slim@sha256:4f77a690f2f8946ab16fe1e791a3ac0667ae1c3575c3e4d0d4589e9ed5bfaf3d
 
 ENV DEBIAN_FRONTEND=noninteractive
 

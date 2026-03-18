@@ -69,7 +69,16 @@ export async function validateApiKey(
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: controller.signal,
+      redirect: "manual",
     });
+
+    if (response.status >= 300 && response.status < 400) {
+      return {
+        valid: false,
+        models: [],
+        error: "Endpoint returned a redirect — redirects are not followed for security",
+      };
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
@@ -119,7 +128,7 @@ export function validateKeyPrefix(apiKey: string, prefixes: string[] | undefined
   if (!prefixes || prefixes.length === 0) return null;
   const matches = prefixes.some((prefix) => apiKey.startsWith(prefix));
   if (matches) return null;
-  return `Key does not match expected prefix(es): ${prefixes.join(", ")}. Got: ${apiKey.slice(0, 6)}...`;
+  return `Key does not match expected prefix(es): ${prefixes.join(", ")}. Got: ${apiKey.slice(0, 3)}...`;
 }
 
 /**
@@ -141,10 +150,17 @@ export async function validateEndpointReachable(
   }, 5_000);
 
   try {
-    await fetch(url, {
+    const response = await fetch(url, {
       method: "HEAD",
       signal: controller.signal,
+      redirect: "manual",
     });
+    if (response.status >= 300 && response.status < 400) {
+      return {
+        reachable: false,
+        error: "Endpoint returned a redirect — redirects are not followed for security",
+      };
+    }
     // Any HTTP response (even 401/403) means the endpoint is reachable
     return { reachable: true };
   } catch (err) {

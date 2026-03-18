@@ -152,7 +152,13 @@ install_node() {
       brew link --overwrite node@22 2>/dev/null || true
       ;;
     nodesource)
-      curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - > /dev/null 2>&1
+      # SEC-DEP-007: Download installer to temp file before executing (no piping to sh)
+      local nodesource_tmp
+      nodesource_tmp="$(mktemp)"
+      curl -fsSL https://deb.nodesource.com/setup_22.x -o "$nodesource_tmp" \
+        || { rm -f "$nodesource_tmp"; fail "Failed to download NodeSource installer"; }
+      sudo -E bash "$nodesource_tmp" > /dev/null 2>&1
+      rm -f "$nodesource_tmp"
       sudo apt-get install -y -qq nodejs > /dev/null 2>&1
       ;;
     none)

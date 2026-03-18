@@ -107,7 +107,14 @@ function runAgentInSandbox(message, sessionId) {
     const proc = require("child_process").spawn("ssh", ["-T", "-F", confPath, `openshell-${SANDBOX}`, cmd], {
       timeout: 120000,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, NVIDIA_API_KEY: API_KEY },
+      env: {
+        // Minimal env allowlist — prevent leaking TELEGRAM_BOT_TOKEN,
+        // ALLOWED_CHAT_IDS, GITHUB_TOKEN, etc. to subprocess (CHAIN-003)
+        ...(["PATH", "HOME", "TERM", "SHELL", "USER", "SSH_AUTH_SOCK"]
+          .filter((k) => process.env[k])
+          .reduce((acc, k) => { acc[k] = process.env[k]; return acc; }, {})),
+        NVIDIA_API_KEY: API_KEY,
+      },
     });
 
     let stdout = "";
@@ -140,14 +147,16 @@ function runAgentInSandbox(message, sessionId) {
       if (response) {
         resolve(response);
       } else if (code !== 0) {
-        resolve(`Agent exited with code ${code}. ${stderr.trim().slice(0, 500)}`);
+        console.error(`[agent] exited with code ${code}: ${stderr.trim()}`);
+        resolve("Agent encountered an error. Check server logs for details.");
       } else {
         resolve("(no response)");
       }
     });
 
     proc.on("error", (err) => {
-      resolve(`Error: ${err.message}`);
+      console.error("[agent] spawn error:", err);
+      resolve("Agent encountered an error. Check server logs for details.");
     });
   });
 }
@@ -174,7 +183,7 @@ async function poll() {
         }
 
         const userName = msg.from?.first_name || "someone";
-        console.log(`[${chatId}] ${userName}: ${msg.text.slice(0, 50)}${msg.text.length > 50 ? "..." : ""}`);
+        console.log(`[${chatId}] ${userName}: message received (${msg.text.length} chars)`);
 
         // Handle /start
         if (msg.text === "/start") {
@@ -205,11 +214,12 @@ async function poll() {
         try {
           const response = await runAgentInSandbox(msg.text, chatId);
           clearInterval(typingInterval);
-          console.log(`[${chatId}] agent: ${response.slice(0, 100)}...`);
+          console.log(`[${chatId}] agent response (${response.length} chars)`);
           await sendMessage(chatId, response, msg.message_id);
         } catch (err) {
           clearInterval(typingInterval);
-          await sendMessage(chatId, `Error: ${err.message}`, msg.message_id);
+          console.error(`[${chatId}] error:`, err);
+          await sendMessage(chatId, "An unexpected error occurred. Check server logs.", msg.message_id);
         }
       }
     }

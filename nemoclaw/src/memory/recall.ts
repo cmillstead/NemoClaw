@@ -20,6 +20,19 @@ import { extractKeywords } from "./compaction.js";
 const MAX_RECALL_TOKENS = 500;
 const MIN_KEYWORD_RESULTS = 2;
 
+/**
+ * Escape XML special characters to prevent injection in recalled memory blocks.
+ * Handles: < > & " '
+ */
+export function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 interface RecallResult {
   path: string;
   content: string;
@@ -104,7 +117,7 @@ function formatRecallBlock(results: RecallResult[]): string {
     const fact = extractFactFromContent(result.content);
     if (!fact) continue;
 
-    const entry = `<recalled-memory type="fact" source="${result.path}">\n  ${fact}\n</recalled-memory>`;
+    const entry = `<recalled-memory type="fact" source="${escapeXml(result.path)}">\n  ${escapeXml(fact)}\n</recalled-memory>`;
     const entryTokens = Math.ceil(entry.length / 4);
 
     if (estimatedTokens + entryTokens > MAX_RECALL_TOKENS) break;

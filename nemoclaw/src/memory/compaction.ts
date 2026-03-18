@@ -14,7 +14,7 @@
 
 import { randomBytes } from "node:crypto";
 import type { MessageRecord, CompactionExtraction, CompactionResult } from "./types.js";
-import { scanForSecrets } from "./sanitize.js";
+import { redactAllSecrets } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
 // Stop words for topic extraction
@@ -250,28 +250,7 @@ export function estimateTokens(text: string): number {
 // Compaction
 // ---------------------------------------------------------------------------
 
-/**
- * Redact secrets from compaction summaries before storage.
- */
-function redactSecretsInSummary(text: string): string {
-  const result = scanForSecrets(text);
-  if (result.valid) return text;
-  return text
-    .replace(/\bsk-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bsk-or-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bnvapi-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bghp_[a-zA-Z0-9]{36,}\b/g, "[REDACTED]")
-    .replace(/\bghs_[a-zA-Z0-9]{36,}\b/g, "[REDACTED]")
-    .replace(/\bglpat-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
-    .replace(/\bxoxb-[a-zA-Z0-9-]{20,}\b/g, "[REDACTED]")
-    .replace(/\bxoxp-[a-zA-Z0-9-]{20,}\b/g, "[REDACTED]")
-    .replace(
-      /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END \1?PRIVATE KEY-----/g,
-      "[REDACTED]",
-    )
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]")
-    .replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, "[REDACTED]");
-}
+// Secret redaction now uses shared redactAllSecrets from sanitize.ts
 
 /**
  * Run extractive compaction on a list of messages.
@@ -307,7 +286,7 @@ export function compact(
   const summary = formatSummary(extraction);
 
   // Redact any secrets that leaked into the compaction summary (SEC-DAT-011)
-  const safeSummary = redactSecretsInSummary(summary);
+  const safeSummary = redactAllSecrets(summary);
 
   const compactionId = `comp-${new Date()
     .toISOString()

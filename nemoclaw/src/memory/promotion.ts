@@ -227,7 +227,7 @@ function writeDailyNote(memoryDir: string, sessionId: string, promotedPaths: str
       content = lines.join("\n");
     }
 
-    writeFileSync(dailyPath, content, "utf-8");
+    writeFileSync(dailyPath, content, { encoding: "utf-8", mode: 0o600 });
   } catch {
     // Non-fatal -- daily notes are a convenience feature
   }

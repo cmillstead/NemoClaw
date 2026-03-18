@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TranscriptDb } from "./transcript-db.js";
@@ -187,6 +187,23 @@ describe("TranscriptDb", () => {
       expect(db.getPromotedFactCount("sess-001")).toBe(2);
       expect(db.getPromotedFactCount("sess-001", "auto")).toBe(1);
       expect(db.getPromotedFactCount("sess-001", "agent")).toBe(1);
+    });
+  });
+
+  describe("file permissions", () => {
+    it("sets database file to mode 0o600", () => {
+      const dbPath = join(tmpDir, "_db", "sessions.db");
+      const stat = statSync(dbPath);
+      // 0o600 = owner read+write only (octal 0600 = decimal 384)
+      const mode = stat.mode & 0o777;
+      expect(mode).toBe(0o600);
+    });
+
+    it("sets database directory to mode 0o700", () => {
+      const dbDir = join(tmpDir, "_db");
+      const stat = statSync(dbDir);
+      const mode = stat.mode & 0o777;
+      expect(mode).toBe(0o700);
     });
   });
 
