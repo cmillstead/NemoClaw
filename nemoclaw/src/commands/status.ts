@@ -16,16 +16,17 @@ const defaultExecAsync = promisify(exec);
  * host commands are not available, so querying `openshell sandbox status`
  * would always fail — producing false-negative "not running" reports.
  */
-function isInsideSandbox(
-  checkExists: (path: string) => boolean = nodeExistsSync,
-): boolean {
+function isInsideSandbox(checkExists: (path: string) => boolean = nodeExistsSync): boolean {
   return checkExists("/sandbox/.openclaw") || checkExists("/sandbox/.nemoclaw");
 }
 
 /** Injectable dependencies for testing without mocks. */
 export interface StatusDeps {
   existsSync: (path: string) => boolean;
-  execAsync: (cmd: string, opts: { timeout: number }) => Promise<{ stdout: string; stderr: string }>;
+  execAsync: (
+    cmd: string,
+    opts: { timeout: number },
+  ) => Promise<{ stdout: string; stderr: string }>;
   loadState: () => NemoClawState;
 }
 

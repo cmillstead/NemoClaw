@@ -6,7 +6,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"; // mock-ok: readl
 const mockQuestion = vi.fn(); // mock-ok: readline is interactive stdin — no real alternative
 const mockClose = vi.fn(); // mock-ok: readline is interactive stdin
 
-vi.mock("node:readline/promises", () => ({ // mock-ok: readline is interactive stdin — no real alternative exists
+vi.mock("node:readline/promises", () => ({
+  // mock-ok: readline is interactive stdin — no real alternative exists
   createInterface: () => ({
     question: mockQuestion,
     close: mockClose,

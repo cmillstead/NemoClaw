@@ -64,9 +64,7 @@ function captureLogger(): { lines: string[]; logger: PluginLogger } {
  * Create a fake execAsync that routes by command substring.
  * Injected via StatusDeps — no module-level patching needed.
  */
-function fakeExec(
-  responses: Record<string, string | Error>,
-): StatusDeps["execAsync"] {
+function fakeExec(responses: Record<string, string | Error>): StatusDeps["execAsync"] {
   return (cmd: string) => {
     for (const [substring, response] of Object.entries(responses)) {
       if (cmd.includes(substring)) {
@@ -112,7 +110,9 @@ describe("cliStatus", () => {
     tmpDir = mkdtempSync(join(tmpdir(), "status-test-"));
   });
 
-  const cleanup = () => { rmSync(tmpDir, { recursive: true, force: true }); };
+  const cleanup = () => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  };
 
   // =========================================================================
   // Scenario 1: Host — no openshell, blank state
@@ -385,7 +385,10 @@ describe("cliStatus", () => {
         execAsync: (cmd: string) => {
           execCalls.push(cmd);
           if (cmd.includes("sandbox status")) {
-            return Promise.resolve({ stdout: JSON.stringify({ state: "running", uptime: "1m" }), stderr: "" });
+            return Promise.resolve({
+              stdout: JSON.stringify({ state: "running", uptime: "1m" }),
+              stderr: "",
+            });
           }
           return Promise.reject(new Error("not configured"));
         },

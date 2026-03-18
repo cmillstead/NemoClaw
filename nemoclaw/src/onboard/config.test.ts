@@ -11,11 +11,7 @@ import {
   type NemoClawOnboardConfig,
 } from "./config.js";
 
-const CONFIG_PATH = join(
-  process.env.HOME ?? "/tmp",
-  ".nemoclaw",
-  "config.json",
-);
+const CONFIG_PATH = join(process.env.HOME ?? "/tmp", ".nemoclaw", "config.json");
 
 let backedUpConfig: string | null = null;
 
@@ -33,9 +29,7 @@ afterAll(() => {
   }
 });
 
-function makeConfig(
-  overrides: Partial<NemoClawOnboardConfig> = {},
-): NemoClawOnboardConfig {
+function makeConfig(overrides: Partial<NemoClawOnboardConfig> = {}): NemoClawOnboardConfig {
   return {
     endpointType: "openrouter",
     endpointUrl: "https://openrouter.ai/api/v1",

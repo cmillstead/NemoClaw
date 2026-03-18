@@ -36,7 +36,9 @@ describe("recallMemories", () => {
 
   it("does not throw even when memoryDir does not exist", () => {
     const bogusDir = join(tempDir, "nonexistent", "deeply", "nested");
-    expect(() => recallMemories("architecture patterns for memory systems", bogusDir)).not.toThrow();
+    expect(() =>
+      recallMemories("architecture patterns for memory systems", bogusDir),
+    ).not.toThrow();
   });
 
   it("handles non-existent memoryDir gracefully and returns empty string", () => {
@@ -46,7 +48,10 @@ describe("recallMemories", () => {
   });
 
   it("returns a string type regardless of input", () => {
-    const result = recallMemories("complex query about typescript compilation and bundling", tempDir);
+    const result = recallMemories(
+      "complex query about typescript compilation and bundling",
+      tempDir,
+    );
     expect(typeof result).toBe("string");
   });
 });
