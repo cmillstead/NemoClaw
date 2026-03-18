@@ -1,4 +1,4 @@
-export type EndpointType = "build" | "ncp" | "nim-local" | "vllm" | "ollama" | "custom";
+export type EndpointType = "build" | "ncp" | "openrouter" | "nim-local" | "vllm" | "ollama" | "custom";
 export interface NemoClawOnboardConfig {
     endpointType: EndpointType;
     endpointUrl: string;
@@ -6,6 +6,7 @@ export interface NemoClawOnboardConfig {
     model: string;
     profile: string;
     credentialEnv: string;
+    providerLabel?: string;
     onboardedAt: string;
 }
 export declare function loadOnboardConfig(): NemoClawOnboardConfig | null;

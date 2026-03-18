@@ -178,6 +178,11 @@ def action_apply(
     for port in forward_ports:
         create_args.extend(["--forward", str(port)])
 
+    # Mount memory volume for persistent cross-session memory
+    memory_host_path = str(Path.home() / ".nemoclaw" / "memory")
+    Path(memory_host_path).mkdir(parents=True, exist_ok=True)
+    create_args.extend(["--volume", f"{memory_host_path}:/sandbox/memory"])
+
     result = run_cmd(create_args, check=False, capture=True)
     if result.returncode != 0:
         if "already exists" in (result.stderr or ""):
