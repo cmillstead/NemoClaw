@@ -126,9 +126,6 @@ async function deploy(instanceName) {
   console.log("  Running setup...");
   runArgv("ssh", ["-t", "-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && bash scripts/brev-setup.sh"]);
 
-  // Clean up remote .env after sourcing (SEC-DAT-004)
-  runArgv("ssh", ["-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && rm -f .env"]);
-
   if (tgToken) {
     console.log("  Starting services...");
     runArgv("ssh", ["-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && bash scripts/start-services.sh"]);
@@ -138,6 +135,9 @@ async function deploy(instanceName) {
   console.log("  Connecting to sandbox...");
   console.log("");
   runArgv("ssh", ["-t", "-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && set -a && . .env && set +a && openshell sandbox connect nemoclaw"]);
+
+  // Clean up remote .env after all commands that need it (SEC-DAT-004)
+  runArgv("ssh", ["-o", "StrictHostKeyChecking=accept-new", "-o", "LogLevel=ERROR", name, "cd /home/ubuntu/nemoclaw && rm -f .env"]);
 }
 
 async function start() {
