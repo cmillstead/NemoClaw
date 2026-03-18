@@ -33,9 +33,18 @@ function validateEndpointUrl(endpointUrl: string): { valid: boolean; error?: str
   if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
     return { valid: true };
   }
+  // Normalize hostname: strip IPv6 brackets and handle IPv4-mapped IPv6
+  const host = parsed.hostname.replace(/^\[|\]$/g, "");
+  // Block IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1, ::ffff:7f00:1)
+  if (/^::ffff:/i.test(host)) {
+    return {
+      valid: false,
+      error: "URL points to a private/internal network address (IPv4-mapped IPv6)",
+    };
+  }
   // Block private IP ranges (SSRF protection)
   for (const range of PRIVATE_RANGES) {
-    if (range.test(parsed.hostname)) {
+    if (range.test(host)) {
       return { valid: false, error: "URL points to a private/internal network address" };
     }
   }
