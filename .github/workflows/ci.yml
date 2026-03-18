@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nemoclaw
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: nemoclaw/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+  blueprint-syntax:
+    name: Blueprint Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - name: Verify Python syntax
+        run: python3 -c "import ast; ast.parse(open('nemoclaw-blueprint/orchestrator/runner.py').read()); print('Python OK')"
+
+      - name: Verify YAML syntax
+        run: python3 -c "import yaml; yaml.safe_load(open('nemoclaw-blueprint/policies/openclaw-sandbox.yaml')); print('YAML OK')"
+
+      - name: Verify shell scripts
+        run: |
+          for f in nemoclaw-blueprint/scripts/*.sh; do
+            bash -n "$f" && echo "OK: $f"
+          done
