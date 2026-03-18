@@ -52,7 +52,10 @@ function resolveMemoryDir(): string {
 /**
  * Create the memory service for plugin registration.
  */
-export function createMemoryService(_api: OpenClawPluginApi, spawner: SpawnSession = null): PluginService {
+export function createMemoryService(
+  _api: OpenClawPluginApi,
+  spawner: SpawnSession = null,
+): PluginService {
   return {
     id: "nemoclaw-memory",
     start: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => {

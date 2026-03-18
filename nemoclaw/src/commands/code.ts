@@ -29,7 +29,12 @@ function resolveProviderConfig(): GooseProviderConfig {
     case "openrouter":
       return { provider: "openrouter", apiKey, model: onboard.model, maxTurns: 25 };
     case "ollama":
-      return { provider: "ollama", endpoint: onboard.endpointUrl, model: onboard.model, maxTurns: 25 };
+      return {
+        provider: "ollama",
+        endpoint: onboard.endpointUrl,
+        model: onboard.model,
+        maxTurns: 25,
+      };
     default:
       return {
         provider: "openai",

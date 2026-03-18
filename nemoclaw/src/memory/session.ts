@@ -123,7 +123,7 @@ export class SessionManager {
 
       this.db.updateSessionStatus(this.sessionId, "active");
       this.logger.info(
-        `Compaction complete: ${result.originalTokenCount} -> ${result.summaryTokenCount} tokens`,
+        `Compaction complete: ${String(result.originalTokenCount)} -> ${String(result.summaryTokenCount)} tokens`,
       );
       return true;
     } catch (err) {
@@ -238,8 +238,6 @@ export class SessionManager {
       comp.message_range_end,
     );
 
-    return messages
-      .map((m) => `**${m.role}** (${m.created_at}): ${m.content}`)
-      .join("\n\n");
+    return messages.map((m) => `**${m.role}** (${m.created_at}): ${m.content}`).join("\n\n");
   }
 }

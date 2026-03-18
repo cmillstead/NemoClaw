@@ -200,7 +200,7 @@ describe("TranscriptDb", () => {
     it("handles rapid sequential writes", () => {
       db.createSession("sess-001", null);
       for (let i = 0; i < 100; i++) {
-        db.appendMessage("sess-001", "user", `Message ${i}`, 5);
+        db.appendMessage("sess-001", "user", `Message ${String(i)}`, 5);
       }
       expect(db.getSessionMessageCount("sess-001")).toBe(100);
       expect(db.getSessionTokenCount("sess-001")).toBe(500);

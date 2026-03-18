@@ -38,11 +38,17 @@ export class Orchestrator {
   }
 
   spawnCompaction(sessionId: string): string | null {
-    return this.spawn("compact", `Compact session ${sessionId}: run extractive compaction on active messages and write results to the transcript database.`);
+    return this.spawn(
+      "compact",
+      `Compact session ${sessionId}: run extractive compaction on active messages and write results to the transcript database.`,
+    );
   }
 
   spawnPromotion(sessionId: string): string | null {
-    return this.spawn("promote", `Promote facts from session ${sessionId}: extract durable facts from the transcript, deduplicate, and write to PARA storage.`);
+    return this.spawn(
+      "promote",
+      `Promote facts from session ${sessionId}: extract durable facts from the transcript, deduplicate, and write to PARA storage.`,
+    );
   }
 
   spawnJanitor(): string | null {
@@ -50,7 +56,10 @@ export class Orchestrator {
       this.logger.info("Janitor skipped: lock held by another process");
       return null;
     }
-    const result = this.spawn("janitor", "Memory maintenance: scan for duplicate facts, supersede duplicates, regenerate manifest and category MOCs.");
+    const result = this.spawn(
+      "janitor",
+      "Memory maintenance: scan for duplicate facts, supersede duplicates, regenerate manifest and category MOCs.",
+    );
     if (!result) {
       this.releaseJanitorLock();
     }
@@ -106,7 +115,9 @@ export class Orchestrator {
         if (lockAge < STALE_LOCK_MS) {
           return false;
         }
-        this.logger.warn(`Force-releasing stale janitor lock (age: ${String(Math.round(lockAge / 1000))}s)`);
+        this.logger.warn(
+          `Force-releasing stale janitor lock (age: ${String(Math.round(lockAge / 1000))}s)`,
+        );
       } catch {
         // Corrupt lock file — safe to overwrite
       }

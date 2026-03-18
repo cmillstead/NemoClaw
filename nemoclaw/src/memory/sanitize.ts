@@ -85,7 +85,7 @@ export function validateContent(content: string, maxSize: number): SanitizeResul
     return { valid: false, reason: "Content is empty" };
   }
   if (Buffer.byteLength(content, "utf-8") > maxSize) {
-    return { valid: false, reason: `Content exceeds maximum size of ${maxSize} bytes` };
+    return { valid: false, reason: `Content exceeds maximum size of ${String(maxSize)} bytes` };
   }
 
   const secretResult = scanForSecrets(content);

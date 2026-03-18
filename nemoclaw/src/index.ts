@@ -18,8 +18,19 @@ import { loadOnboardConfig } from "./onboard/config.js";
 import { createMemoryService, getSessionManager, getOrchestrator } from "./memory/service.js";
 import { handleMemorySlashCommand } from "./commands/memory.js";
 import { handleCodeSlashCommand } from "./commands/code.js";
-import { handlePrepareSubagentSpawn, handleSubagentEnded, handleAfterTurn } from "./memory/context-hooks.js";
-import type { SubagentSpawnContext, SubagentEndedContext, AfterTurnContext, SpawnSession, NemoClawOp, ContextEnginePlugin } from "./memory/types.js";
+import {
+  handlePrepareSubagentSpawn,
+  handleSubagentEnded,
+  handleAfterTurn,
+} from "./memory/context-hooks.js";
+import type {
+  SubagentSpawnContext,
+  SubagentEndedContext,
+  AfterTurnContext,
+  SpawnSession,
+  NemoClawOp,
+  ContextEnginePlugin,
+} from "./memory/types.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -208,9 +219,10 @@ export default function register(api: OpenClawPluginApi): void {
   });
 
   // 1d. Bind SpawnSession from the API (if available)
-  const spawner: SpawnSession = typeof (api as Record<string, unknown>).spawn === "function"
-    ? ((api as Record<string, unknown>).spawn as SpawnSession)
-    : null;
+  const spawner: SpawnSession =
+    typeof (api as unknown as Record<string, unknown>).spawn === "function"
+      ? ((api as unknown as Record<string, unknown>).spawn as SpawnSession)
+      : null;
 
   // 1c. Register memory background service (with spawner for async ops)
   api.registerService(createMemoryService(api, spawner));
@@ -269,7 +281,9 @@ export default function register(api: OpenClawPluginApi): void {
       });
       api.logger.info("ContextEngine hooks registered via api.on() fallback");
     } catch {
-      api.logger.info("ContextEngine hooks not available — memory system runs without subagent awareness");
+      api.logger.info(
+        "ContextEngine hooks not available — memory system runs without subagent awareness",
+      );
     }
   }
 

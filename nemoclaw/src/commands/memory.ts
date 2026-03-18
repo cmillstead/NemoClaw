@@ -163,9 +163,7 @@ function memoryFacts(category: ParaCategory | ""): PluginCommandResult {
   const config = mgr.getConfig();
 
   try {
-    const cat = category && PARA_CATEGORIES.includes(category as ParaCategory)
-      ? category as ParaCategory
-      : undefined;
+    const cat = category && PARA_CATEGORIES.includes(category) ? category : undefined;
     const facts = listFacts(config.memoryDir, cat);
 
     if (facts.length === 0) {

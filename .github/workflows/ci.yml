@@ -29,15 +29,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true  # 120 pre-existing errors — enforce after cleanup
 
       - name: Format check
         run: npm run format:check
-        continue-on-error: true  # 28 files need formatting — enforce after cleanup
 
       - name: Typecheck
         run: npx tsc --noEmit
-        continue-on-error: true  # Pre-existing: node:sqlite types, type assertion issues
 
       - name: Test
         run: npm test

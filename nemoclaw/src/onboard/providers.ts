@@ -107,8 +107,8 @@ export const PROVIDERS: ProviderDefinition[] = [
   {
     id: "ollama",
     label: "Local Ollama",
-    hint: ((ctx: { ollamaInstalled: boolean }) =>
-      ctx.ollamaInstalled ? "installed locally" : "localhost:11434"),
+    hint: (ctx: { ollamaInstalled: boolean }) =>
+      ctx.ollamaInstalled ? "installed locally" : "localhost:11434",
     profile: "ollama",
     providerName: "ollama-local",
     credentialEnv: "OPENAI_API_KEY",

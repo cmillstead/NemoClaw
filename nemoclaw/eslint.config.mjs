@@ -8,7 +8,7 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        projectService: true,
+        project: ["tsconfig.json", "tsconfig.test.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -25,6 +25,20 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/consistent-type-imports": "error",
+    },
+  },
+  {
+    files: ["src/**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
     },
   },
   prettier,
