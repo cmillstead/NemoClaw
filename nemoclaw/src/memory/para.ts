@@ -281,7 +281,10 @@ export function supersedeFact(filePath: string, supersededById?: string): boolea
     const content = readFileSync(filePath, "utf-8");
     let updated = content.replace(/^status: "active"$/m, 'status: "superseded"');
     if (supersededById) {
-      updated = updated.replace(/^superseded_by: null$/m, `superseded_by: ${JSON.stringify(supersededById)}`);
+      updated = updated.replace(
+        /^superseded_by: null$/m,
+        `superseded_by: ${JSON.stringify(supersededById)}`,
+      );
     }
     updated = updated.replace(
       /^updated_at: .*$/m,

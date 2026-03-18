@@ -20,24 +20,69 @@ import type { SanitizeResult } from "./types.js";
 // ---------------------------------------------------------------------------
 
 const SECRET_PATTERNS: readonly { pattern: RegExp; redact: RegExp; label: string }[] = [
-  { pattern: /\bsk-[a-zA-Z0-9]{20,}\b/, redact: /\bsk-[a-zA-Z0-9]{20,}\b/g, label: "OpenAI API key" },
-  { pattern: /\bsk-or-[a-zA-Z0-9]{20,}\b/, redact: /\bsk-or-[a-zA-Z0-9]{20,}\b/g, label: "OpenRouter API key" },
-  { pattern: /\bnvapi-[a-zA-Z0-9]{20,}\b/, redact: /\bnvapi-[a-zA-Z0-9]{20,}\b/g, label: "NVIDIA API key" },
+  {
+    pattern: /\bsk-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bsk-[a-zA-Z0-9]{20,}\b/g,
+    label: "OpenAI API key",
+  },
+  {
+    pattern: /\bsk-or-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bsk-or-[a-zA-Z0-9]{20,}\b/g,
+    label: "OpenRouter API key",
+  },
+  {
+    pattern: /\bnvapi-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bnvapi-[a-zA-Z0-9]{20,}\b/g,
+    label: "NVIDIA API key",
+  },
   { pattern: /\bghp_[a-zA-Z0-9]{36,}\b/, redact: /\bghp_[a-zA-Z0-9]{36,}\b/g, label: "GitHub PAT" },
-  { pattern: /\bghs_[a-zA-Z0-9]{36,}\b/, redact: /\bghs_[a-zA-Z0-9]{36,}\b/g, label: "GitHub App token" },
-  { pattern: /\bglpat-[a-zA-Z0-9]{20,}\b/, redact: /\bglpat-[a-zA-Z0-9]{20,}\b/g, label: "GitLab PAT" },
-  { pattern: /\bxoxb-[a-zA-Z0-9-]{20,}\b/, redact: /\bxoxb-[a-zA-Z0-9-]{20,}\b/g, label: "Slack bot token" },
-  { pattern: /\bxoxp-[a-zA-Z0-9-]{20,}\b/, redact: /\bxoxp-[a-zA-Z0-9-]{20,}\b/g, label: "Slack user token" },
+  {
+    pattern: /\bghs_[a-zA-Z0-9]{36,}\b/,
+    redact: /\bghs_[a-zA-Z0-9]{36,}\b/g,
+    label: "GitHub App token",
+  },
+  {
+    pattern: /\bglpat-[a-zA-Z0-9]{20,}\b/,
+    redact: /\bglpat-[a-zA-Z0-9]{20,}\b/g,
+    label: "GitLab PAT",
+  },
+  {
+    pattern: /\bxoxb-[a-zA-Z0-9-]{20,}\b/,
+    redact: /\bxoxb-[a-zA-Z0-9-]{20,}\b/g,
+    label: "Slack bot token",
+  },
+  {
+    pattern: /\bxoxp-[a-zA-Z0-9-]{20,}\b/,
+    redact: /\bxoxp-[a-zA-Z0-9-]{20,}\b/g,
+    label: "Slack user token",
+  },
   {
     pattern: /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/,
-    redact: /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+    redact:
+      /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
     label: "Private key",
   },
   { pattern: /\bAKIA[0-9A-Z]{16}\b/, redact: /\bAKIA[0-9A-Z]{16}\b/g, label: "AWS access key" },
-  { pattern: /\bAIza[0-9A-Za-z_-]{35}\b/, redact: /\bAIza[0-9A-Za-z_-]{35}\b/g, label: "Google API key" },
-  { pattern: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/, redact: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/g, label: "Anthropic API key" },
-  { pattern: /\bhf_[a-zA-Z0-9]{20,}\b/, redact: /\bhf_[a-zA-Z0-9]{20,}\b/g, label: "Hugging Face token" },
-  { pattern: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/, redact: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/g, label: "Telegram bot token" },
+  {
+    pattern: /\bAIza[0-9A-Za-z_-]{35}\b/,
+    redact: /\bAIza[0-9A-Za-z_-]{35}\b/g,
+    label: "Google API key",
+  },
+  {
+    pattern: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/,
+    redact: /\bsk-ant-[a-zA-Z0-9_-]{20,}\b/g,
+    label: "Anthropic API key",
+  },
+  {
+    pattern: /\bhf_[a-zA-Z0-9]{20,}\b/,
+    redact: /\bhf_[a-zA-Z0-9]{20,}\b/g,
+    label: "Hugging Face token",
+  },
+  {
+    pattern: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/,
+    redact: /\b\d{8,}:[A-Za-z0-9_-]{35,}\b/g,
+    label: "Telegram bot token",
+  },
   {
     pattern: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/,
     redact: /\bexport\s+[A-Z_]+=\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/g,
