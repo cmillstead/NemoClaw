@@ -66,28 +66,30 @@ describe("policies", () => {
   });
 
   describe("buildPolicySetCommand", () => {
-    it("quotes sandbox name to prevent argument splitting", () => {
-      const cmd = policies.buildPolicySetCommand("/tmp/policy.yaml", "my-assistant");
-      assert.equal(cmd, 'openshell policy set --policy "/tmp/policy.yaml" --wait "my-assistant"');
+    it("returns argv-safe object with cmd and args", () => {
+      const result = policies.buildPolicySetCommand("/tmp/policy.yaml", "my-assistant");
+      assert.equal(result.cmd, "openshell");
+      assert.deepEqual(result.args, ["policy", "set", "--policy", "/tmp/policy.yaml", "--wait", "my-assistant"]);
     });
 
-    it("handles sandbox names with spaces", () => {
-      const cmd = policies.buildPolicySetCommand("/tmp/policy.yaml", "my sandbox");
-      assert.ok(cmd.includes('"my sandbox"'), "sandbox name must be quoted");
+    it("preserves sandbox names with spaces as single arg element", () => {
+      const result = policies.buildPolicySetCommand("/tmp/policy.yaml", "my sandbox");
+      assert.ok(result.args.includes("my sandbox"), "sandbox name must be a single array element");
     });
 
-    it("places --wait before the sandbox name", () => {
-      const cmd = policies.buildPolicySetCommand("/tmp/policy.yaml", "test-box");
-      const waitIdx = cmd.indexOf("--wait");
-      const nameIdx = cmd.indexOf('"test-box"');
+    it("places --wait before the sandbox name in args", () => {
+      const result = policies.buildPolicySetCommand("/tmp/policy.yaml", "test-box");
+      const waitIdx = result.args.indexOf("--wait");
+      const nameIdx = result.args.indexOf("test-box");
       assert.ok(waitIdx < nameIdx, "--wait must come before sandbox name");
     });
   });
 
   describe("buildPolicyGetCommand", () => {
-    it("quotes sandbox name", () => {
-      const cmd = policies.buildPolicyGetCommand("my-assistant");
-      assert.equal(cmd, 'openshell policy get --full "my-assistant" 2>/dev/null');
+    it("returns argv-safe object with cmd and args", () => {
+      const result = policies.buildPolicyGetCommand("my-assistant");
+      assert.equal(result.cmd, "openshell");
+      assert.deepEqual(result.args, ["policy", "get", "--full", "my-assistant"]);
     });
   });
 

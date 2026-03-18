@@ -37,7 +37,6 @@ export DEBIAN_FRONTEND=noninteractive
 if ! command -v node > /dev/null 2>&1; then
   info "Installing Node.js..."
   # SEC-DEP-007: Download installer to temp file before executing (no piping to sh)
-  local nodesource_tmp
   nodesource_tmp="$(mktemp)"
   curl -fsSL https://deb.nodesource.com/setup_22.x -o "$nodesource_tmp" \
     || { rm -f "$nodesource_tmp"; fail "Failed to download NodeSource installer"; }
@@ -95,6 +94,30 @@ if ! command -v openshell > /dev/null 2>&1; then
   tmpdir="$(mktemp -d)"
   GH_TOKEN="${GITHUB_TOKEN:-}" gh release download --repo NVIDIA/OpenShell \
     --pattern "$ASSET" --dir "$tmpdir"
+
+  # SEC-V-005: Verify download integrity via checksums file
+  CHECKSUMS_URL="https://github.com/NVIDIA/OpenShell/releases/latest/download/checksums.txt"
+  if curl -fsSL "$CHECKSUMS_URL" -o "$tmpdir/checksums.txt" 2>/dev/null; then
+    expected_hash="$(grep "$ASSET" "$tmpdir/checksums.txt" | awk '{print $1}')"
+    if [ -n "$expected_hash" ]; then
+      if command -v sha256sum > /dev/null 2>&1; then
+        actual_hash="$(sha256sum "$tmpdir/$ASSET" | awk '{print $1}')"
+      elif command -v shasum > /dev/null 2>&1; then
+        actual_hash="$(shasum -a 256 "$tmpdir/$ASSET" | awk '{print $1}')"
+      else
+        warn "No SHA-256 tool found — skipping openshell integrity check"
+        actual_hash="$expected_hash"
+      fi
+      if [ "$actual_hash" != "$expected_hash" ]; then
+        rm -rf "$tmpdir"
+        fail "openshell integrity check failed (expected: $expected_hash, actual: $actual_hash)"
+      fi
+      info "openshell integrity verified"
+    fi
+  else
+    warn "Checksums file not available — skipping openshell integrity verification"
+  fi
+
   tar xzf "$tmpdir/$ASSET" -C "$tmpdir"
   sudo install -m 755 "$tmpdir/openshell" /usr/local/bin/openshell
   rm -rf "$tmpdir"
@@ -112,13 +135,11 @@ if ! command -v cloudflared > /dev/null 2>&1; then
     aarch64|arm64) CF_ARCH="arm64" ;;
     *) fail "Unsupported architecture for cloudflared: $CF_ARCH" ;;
   esac
-  local cf_tmp
   cf_tmp="$(mktemp)"
   curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -o "$cf_tmp"
   # SEC-DEP-018: Verify cloudflared binary integrity via checksums
-  local cf_checksums_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}.sha256"
+  cf_checksums_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}.sha256"
   if curl -fsSL "$cf_checksums_url" -o "${cf_tmp}.sha256" 2>/dev/null; then
-    local cf_expected cf_actual
     cf_expected="$(awk '{print $1}' "${cf_tmp}.sha256")"
     if command -v sha256sum > /dev/null 2>&1; then
       cf_actual="$(sha256sum "$cf_tmp" | awk '{print $1}')"

@@ -118,102 +118,11 @@ install_nodejs() {
 }
 
 # ---------------------------------------------------------------------------
-# 2. Ollama
+# 2. Ollama (removed — SEC-V-004)
 # ---------------------------------------------------------------------------
-OLLAMA_MIN_VERSION="0.18.0"
-# TODO: update hash after verifying current Ollama installer at https://ollama.com/install.sh
-OLLAMA_INSTALLER_SHA256="PLACEHOLDER_UPDATE_WITH_ACTUAL_SHA256_HASH"
-
-download_and_verify_ollama_installer() {
-  local ollama_tmp
-  ollama_tmp="$(mktemp)"
-  curl -fsSL https://ollama.com/install.sh -o "$ollama_tmp" \
-    || { rm -f "$ollama_tmp"; error "Failed to download Ollama installer"; }
-  local actual_hash
-  if command_exists sha256sum; then
-    actual_hash="$(sha256sum "$ollama_tmp" | awk '{print $1}')"
-  elif command_exists shasum; then
-    actual_hash="$(shasum -a 256 "$ollama_tmp" | awk '{print $1}')"
-  else
-    warn "No SHA-256 tool found — skipping Ollama installer integrity check"
-    actual_hash="$OLLAMA_INSTALLER_SHA256"
-  fi
-  if [[ "$actual_hash" != "$OLLAMA_INSTALLER_SHA256" ]]; then
-    rm -f "$ollama_tmp"
-    error "Ollama installer integrity check failed\n  Expected: $OLLAMA_INSTALLER_SHA256\n  Actual:   $actual_hash"
-  fi
-  info "Ollama installer integrity verified"
-  sh "$ollama_tmp"
-  rm -f "$ollama_tmp"
-}
-
-get_ollama_version() {
-  # `ollama --version` outputs something like "ollama version 0.18.0"
-  ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
-}
-
-detect_gpu() {
-  # Returns 0 if a GPU is detected
-  if command_exists nvidia-smi; then
-    nvidia-smi &>/dev/null && return 0
-  fi
-  return 1
-}
-
-get_vram_mb() {
-  # Returns total VRAM in MiB (NVIDIA only). Falls back to 0.
-  if command_exists nvidia-smi; then
-    nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null \
-      | awk '{s += $1} END {print s+0}'
-    return
-  fi
-  # macOS — report unified memory as VRAM
-  if [[ "$(uname -s)" == "Darwin" ]] && command_exists sysctl; then
-    local bytes
-    bytes=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
-    echo $(( bytes / 1024 / 1024 ))
-    return
-  fi
-  echo 0
-}
-
-install_or_upgrade_ollama() {
-  if detect_gpu && command_exists ollama; then
-    local current
-    current=$(get_ollama_version)
-    if [[ -n "$current" ]] && version_gte "$current" "$OLLAMA_MIN_VERSION"; then
-      info "Ollama v${current} meets minimum requirement (>= v${OLLAMA_MIN_VERSION})"
-    else
-      info "Ollama v${current:-unknown} is below v${OLLAMA_MIN_VERSION} — upgrading…"
-      download_and_verify_ollama_installer
-      info "Ollama upgraded to $(get_ollama_version)"
-    fi
-  else
-    # No ollama — only install if a GPU is present
-    if detect_gpu; then
-      info "GPU detected — installing Ollama…"
-      download_and_verify_ollama_installer
-      info "Ollama installed: v$(get_ollama_version)"
-    else
-      warn "No GPU detected — skipping Ollama installation."
-      return
-    fi
-  fi
-
-  # Pull the appropriate model based on VRAM
-  local vram_mb
-  vram_mb=$(get_vram_mb)
-  local vram_gb=$(( vram_mb / 1024 ))
-  info "Detected ${vram_gb} GB VRAM"
-
-  if (( vram_gb >= 120 )); then
-    info "Pulling nemotron-3-super:120b…"
-    ollama pull nemotron-3-super:120b
-  else
-    info "Pulling nemotron-3-nano:30b…"
-    ollama pull nemotron-3-nano:30b
-  fi
-}
+# Ollama installer functions were removed because the SHA-256 hash was a
+# placeholder that could never verify.  Re-add with a real pinned hash if/when
+# Ollama support is re-enabled.
 
 # ---------------------------------------------------------------------------
 # 3. NemoClaw
@@ -315,7 +224,7 @@ main() {
 
   install_nodejs
   ensure_supported_runtime
-  # install_or_upgrade_ollama
+  # install_or_upgrade_ollama  # SEC-V-004: disabled — Ollama functions removed (placeholder hash)
   install_nemoclaw
   verify_nemoclaw
   post_install_message

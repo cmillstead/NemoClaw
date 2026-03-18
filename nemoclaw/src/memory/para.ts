@@ -158,7 +158,7 @@ function formatFactFile(fm: ParaFactFrontmatter, context?: string): string {
     `category: ${JSON.stringify(fm.category)}`,
     `status: ${JSON.stringify(fm.status)}`,
     `tags:`,
-    ...fm.tags.map((t) => `  - ${t}`),
+    ...fm.tags.map((t) => `  - ${JSON.stringify(t)}`),
     `created_at: ${JSON.stringify(fm.created_at)}`,
     `updated_at: ${JSON.stringify(fm.updated_at)}`,
     `source_session: ${JSON.stringify(fm.source_session)}`,
@@ -202,7 +202,16 @@ export function parseFact(filePath: string): ParaFactFrontmatter | null {
     for (const line of yamlBlock.split("\n")) {
       const arrayItemMatch = line.match(/^\s{2}-\s+(.+)$/);
       if (inArray && arrayItemMatch) {
-        arrayItems.push(arrayItemMatch[1]);
+        let item = arrayItemMatch[1];
+        // Parse JSON-quoted array items (written by JSON.stringify)
+        if (item.startsWith('"') && item.endsWith('"')) {
+          try {
+            item = JSON.parse(item) as string;
+          } catch {
+            item = item.slice(1, -1);
+          }
+        }
+        arrayItems.push(item);
         continue;
       }
 
