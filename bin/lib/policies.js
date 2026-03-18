@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const crypto = require("node:crypto");
-const { ROOT, run, runCapture } = require("./runner");
+const { ROOT, runArgv, runCaptureArgv } = require("./runner");
 const registry = require("./registry");
 
 const PRESETS_DIR = path.join(ROOT, "nemoclaw-blueprint", "policies", "presets");
@@ -75,17 +75,19 @@ function parseCurrentPolicy(raw) {
 }
 
 /**
- * Build the openshell policy set command with properly quoted arguments.
+ * Build the openshell policy set argument array (no shell interpolation).
+ * @returns {{ cmd: string, args: string[] }}
  */
 function buildPolicySetCommand(policyFile, sandboxName) {
-  return `openshell policy set --policy "${policyFile}" --wait "${sandboxName}"`;
+  return { cmd: "openshell", args: ["policy", "set", "--policy", policyFile, "--wait", sandboxName] };
 }
 
 /**
- * Build the openshell policy get command with properly quoted arguments.
+ * Build the openshell policy get argument array (no shell interpolation).
+ * @returns {{ cmd: string, args: string[] }}
  */
 function buildPolicyGetCommand(sandboxName) {
-  return `openshell policy get --full "${sandboxName}" 2>/dev/null`;
+  return { cmd: "openshell", args: ["policy", "get", "--full", sandboxName] };
 }
 
 function applyPreset(sandboxName, presetName) {
@@ -104,8 +106,9 @@ function applyPreset(sandboxName, presetName) {
   // Get current policy YAML from sandbox
   let rawPolicy = "";
   try {
-    rawPolicy = runCapture(
-      buildPolicyGetCommand(sandboxName),
+    const getCmd = buildPolicyGetCommand(sandboxName);
+    rawPolicy = runCaptureArgv(
+      getCmd.cmd, getCmd.args,
       { ignoreError: true }
     );
   } catch {}
@@ -165,7 +168,8 @@ function applyPreset(sandboxName, presetName) {
   fs.writeFileSync(tmpFile, merged, "utf-8");
 
   try {
-    run(buildPolicySetCommand(tmpFile, sandboxName));
+    const setCmd = buildPolicySetCommand(tmpFile, sandboxName);
+    runArgv(setCmd.cmd, setCmd.args);
 
     console.log(`  Applied preset: ${presetName}`);
   } finally {

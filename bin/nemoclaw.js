@@ -7,7 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 
-const { ROOT, SCRIPTS, run, runCapture, runArgv, runCaptureArgv, validateInstanceName } = require("./lib/runner");
+const { ROOT, SCRIPTS, runArgv, runCaptureArgv, validateInstanceName } = require("./lib/runner");
 const {
   ensureApiKey,
   ensureGithubToken,
@@ -39,7 +39,7 @@ async function setup() {
   console.log("     Running legacy setup.sh for backwards compatibility...");
   console.log("");
   await ensureApiKey();
-  run(`bash "${SCRIPTS}/setup.sh"`);
+  runArgv("bash", [path.join(SCRIPTS, "setup.sh")]);
 }
 
 async function setupSpark() {
@@ -142,11 +142,11 @@ async function deploy(instanceName) {
 
 async function start() {
   await ensureApiKey();
-  run(`bash "${SCRIPTS}/start-services.sh"`);
+  runArgv("bash", [path.join(SCRIPTS, "start-services.sh")]);
 }
 
 function stop() {
-  run(`bash "${SCRIPTS}/start-services.sh" --stop`);
+  runArgv("bash", [path.join(SCRIPTS, "start-services.sh"), "--stop"]);
 }
 
 function showStatus() {
@@ -164,7 +164,7 @@ function showStatus() {
   }
 
   // Show service status
-  run(`bash "${SCRIPTS}/start-services.sh" --status`);
+  runArgv("bash", [path.join(SCRIPTS, "start-services.sh"), "--status"]);
 }
 
 function listSandboxes() {
@@ -196,8 +196,8 @@ function listSandboxes() {
 
 function sandboxConnect(sandboxName) {
   // Ensure port forward is alive before connecting
-  run(`openshell forward start --background 18789 "${sandboxName}" 2>/dev/null || true`, { ignoreError: true });
-  run(`openshell sandbox connect "${sandboxName}"`);
+  runArgv("openshell", ["forward", "start", "--background", "18789", sandboxName], { ignoreError: true, stdio: ["inherit", "inherit", "ignore"] });
+  runArgv("openshell", ["sandbox", "connect", sandboxName]);
 }
 
 function sandboxStatus(sandboxName) {
@@ -212,7 +212,7 @@ function sandboxStatus(sandboxName) {
   }
 
   // openshell info
-  run(`openshell sandbox get "${sandboxName}" 2>/dev/null || true`, { ignoreError: true });
+  runArgv("openshell", ["sandbox", "get", sandboxName], { ignoreError: true, stdio: ["inherit", "inherit", "ignore"] });
 
   // NIM health
   const nimStat = nim.nimStatus(sandboxName);
@@ -224,8 +224,9 @@ function sandboxStatus(sandboxName) {
 }
 
 function sandboxLogs(sandboxName, follow) {
-  const followFlag = follow ? " --follow" : "";
-  run(`openshell sandbox logs "${sandboxName}"${followFlag}`);
+  const args = ["sandbox", "logs", sandboxName];
+  if (follow) args.push("--follow");
+  runArgv("openshell", args);
 }
 
 async function sandboxPolicyAdd(sandboxName) {
@@ -268,7 +269,7 @@ function sandboxDestroy(sandboxName) {
   nim.stopNimContainer(sandboxName);
 
   console.log(`  Deleting sandbox '${sandboxName}'...`);
-  run(`openshell sandbox delete "${sandboxName}" 2>/dev/null || true`, { ignoreError: true });
+  runArgv("openshell", ["sandbox", "delete", sandboxName], { ignoreError: true, stdio: ["inherit", "inherit", "ignore"] });
 
   registry.removeSandbox(sandboxName);
   console.log(`  ✓ Sandbox '${sandboxName}' destroyed`);

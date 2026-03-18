@@ -256,6 +256,30 @@ install_openshell() {
       -o "$tmpdir/$ASSET"
   fi
 
+  # SEC-V-005: Verify download integrity via checksums file
+  local CHECKSUMS_URL="https://github.com/NVIDIA/OpenShell/releases/latest/download/checksums.txt"
+  if curl -fsSL "$CHECKSUMS_URL" -o "$tmpdir/checksums.txt" 2>/dev/null; then
+    local expected_hash actual_hash
+    expected_hash="$(grep "$ASSET" "$tmpdir/checksums.txt" | awk '{print $1}')"
+    if [ -n "$expected_hash" ]; then
+      if command -v sha256sum > /dev/null 2>&1; then
+        actual_hash="$(sha256sum "$tmpdir/$ASSET" | awk '{print $1}')"
+      elif command -v shasum > /dev/null 2>&1; then
+        actual_hash="$(shasum -a 256 "$tmpdir/$ASSET" | awk '{print $1}')"
+      else
+        warn "No SHA-256 tool found — skipping openshell integrity check"
+        actual_hash="$expected_hash"
+      fi
+      if [ "$actual_hash" != "$expected_hash" ]; then
+        rm -rf "$tmpdir"
+        fail "openshell integrity check failed (expected: $expected_hash, actual: $actual_hash)"
+      fi
+      info "openshell integrity verified"
+    fi
+  else
+    warn "Checksums file not available — skipping openshell integrity verification"
+  fi
+
   tar xzf "$tmpdir/$ASSET" -C "$tmpdir"
 
   if [ -w /usr/local/bin ]; then

@@ -101,12 +101,13 @@ function runAgentInSandbox(message, sessionId) {
     // Base64 encode message to eliminate shell injection (SEC-ATK-003)
     const b64Message = Buffer.from(message).toString("base64");
 
-    // Pass message via base64-encoded stdin; sessionId has quotes stripped as defense-in-depth
-    const cmd = `echo '${b64Message}' | base64 -d | nemoclaw-start openclaw agent --agent main --local --stdin --session-id 'tg-${sessionId.replace(/'/g, "")}'`;
+    // Pass message via stdin to avoid interpolating content into the shell command (SEC-V-002)
+    const sanitizedSessionId = sessionId.replace(/'/g, "");
+    const cmd = `base64 -d | nemoclaw-start openclaw agent --agent main --local --stdin --session-id 'tg-${sanitizedSessionId}'`;
 
     const proc = require("child_process").spawn("ssh", ["-T", "-F", confPath, `openshell-${SANDBOX}`, cmd], {
       timeout: 120000,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: {
         // Minimal env allowlist — prevent leaking TELEGRAM_BOT_TOKEN,
         // ALLOWED_CHAT_IDS, GITHUB_TOKEN, etc. to subprocess (CHAIN-003)
@@ -116,6 +117,10 @@ function runAgentInSandbox(message, sessionId) {
         NVIDIA_API_KEY: API_KEY,
       },
     });
+
+    // Pipe base64-encoded message via stdin instead of shell interpolation
+    proc.stdin.write(b64Message);
+    proc.stdin.end();
 
     let stdout = "";
     let stderr = "";

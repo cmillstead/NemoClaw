@@ -5,7 +5,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { ROOT, SCRIPTS, run, runCapture, runArgv, runCaptureArgv } = require("./runner");
+const { ROOT, SCRIPTS, runArgv, runCaptureArgv } = require("./runner");
 const { prompt, ensureApiKey, getCredential } = require("./credentials");
 const registry = require("./registry");
 const nim = require("./nim");
@@ -24,7 +24,7 @@ function step(n, total, msg) {
 
 function isDockerRunning() {
   try {
-    runCapture("docker info", { ignoreError: false });
+    runCaptureArgv("docker", ["info"], { ignoreError: false });
     return true;
   } catch {
     return false;
@@ -33,7 +33,7 @@ function isDockerRunning() {
 
 function isOpenshellInstalled() {
   try {
-    runCapture("command -v openshell");
+    runCaptureArgv("which", ["openshell"], { ignoreError: false });
     return true;
   } catch {
     return false;
@@ -42,7 +42,7 @@ function isOpenshellInstalled() {
 
 function installOpenshell() {
   console.log("  Installing openshell CLI...");
-  run(`bash "${path.join(SCRIPTS, "install-openshell.sh")}"`, { ignoreError: true });
+  runArgv("bash", [path.join(SCRIPTS, "install-openshell.sh")], { ignoreError: true });
   return isOpenshellInstalled();
 }
 
@@ -67,7 +67,7 @@ async function preflight() {
       process.exit(1);
     }
   }
-  console.log(`  ✓ openshell CLI: ${runCapture("openshell --version 2>/dev/null || echo unknown", { ignoreError: true })}`);
+  console.log(`  ✓ openshell CLI: ${runCaptureArgv("openshell", ["--version"], { ignoreError: true }) || "unknown"}`);
 
   // cgroup v2 + Docker cgroupns
   const cgroup = checkCgroupConfig();
@@ -110,7 +110,7 @@ async function startGateway(gpu) {
   step(2, 7, "Starting OpenShell gateway");
 
   // Destroy old gateway
-  run("openshell gateway destroy -g nemoclaw 2>/dev/null || true", { ignoreError: true });
+  runArgv("openshell", ["gateway", "destroy", "-g", "nemoclaw"], { ignoreError: true });
 
   const gwArgs = ["--name", "nemoclaw"];
   // Do NOT pass --gpu here. On DGX Spark (and most GPU hosts), inference is
@@ -119,11 +119,11 @@ async function startGateway(gpu) {
   // FailedPrecondition errors when the gateway's k3s device plugin cannot
   // allocate GPUs. See: https://build.nvidia.com/spark/nemoclaw/instructions
 
-  run(`openshell gateway start ${gwArgs.join(" ")}`, { ignoreError: false });
+  runArgv("openshell", ["gateway", "start", ...gwArgs], { ignoreError: false });
 
   // Verify health
   for (let i = 0; i < 5; i++) {
-    const status = runCapture("openshell status 2>&1", { ignoreError: true });
+    const status = runCaptureArgv("openshell", ["status"], { ignoreError: true });
     if (status.includes("Connected")) {
       console.log("  ✓ Gateway is healthy");
       break;
@@ -143,7 +143,7 @@ async function startGateway(gpu) {
   ].find((s) => fs.existsSync(s));
   if (colimaSocket) {
     console.log("  Patching CoreDNS for Colima...");
-    run(`bash "${path.join(SCRIPTS, "fix-coredns.sh")}" 2>&1 || true`, { ignoreError: true });
+    runArgv("bash", [path.join(SCRIPTS, "fix-coredns.sh")], { ignoreError: true });
   }
   // Give DNS a moment to propagate
   require("child_process").spawnSync("sleep", ["5"]);
@@ -239,9 +239,9 @@ async function setupNim(sandboxName, gpu) {
   let nimContainer = null;
 
   // Detect local inference options
-  const hasOllama = !!runCapture("command -v ollama", { ignoreError: true });
-  const ollamaRunning = !!runCapture("curl -sf http://localhost:11434/api/tags 2>/dev/null", { ignoreError: true });
-  const vllmRunning = !!runCapture("curl -sf http://localhost:8000/v1/models 2>/dev/null", { ignoreError: true });
+  const hasOllama = !!runCaptureArgv("which", ["ollama"], { ignoreError: true });
+  const ollamaRunning = !!runCaptureArgv("curl", ["-sf", "http://localhost:11434/api/tags"], { ignoreError: true });
+  const vllmRunning = !!runCaptureArgv("curl", ["-sf", "http://localhost:8000/v1/models"], { ignoreError: true });
 
   // Auto-select only with NEMOCLAW_EXPERIMENTAL=1 (prevents silent misconfiguration)
   if (EXPERIMENTAL) {
@@ -328,7 +328,11 @@ async function setupNim(sandboxName, gpu) {
     } else if (selected.key === "ollama") {
       if (!ollamaRunning) {
         console.log("  Starting Ollama...");
-        run("OLLAMA_HOST=0.0.0.0:11434 ollama serve > /dev/null 2>&1 &", { ignoreError: true });
+        const child = require("child_process").spawn("ollama", ["serve"], {
+          stdio: "ignore", detached: true,
+          env: { ...process.env, OLLAMA_HOST: "0.0.0.0:11434" },
+        });
+        child.unref();
         require("child_process").spawnSync("sleep", ["2"]);
       }
       console.log("  ✓ Using Ollama on localhost:11434");
@@ -336,9 +340,13 @@ async function setupNim(sandboxName, gpu) {
       model = "nemotron-3-nano";
     } else if (selected.key === "install-ollama") {
       console.log("  Installing Ollama via Homebrew...");
-      run("brew install ollama", { ignoreError: true });
+      runArgv("brew", ["install", "ollama"], { ignoreError: true });
       console.log("  Starting Ollama...");
-      run("OLLAMA_HOST=0.0.0.0:11434 ollama serve > /dev/null 2>&1 &", { ignoreError: true });
+      const child = require("child_process").spawn("ollama", ["serve"], {
+        stdio: "ignore", detached: true,
+        env: { ...process.env, OLLAMA_HOST: "0.0.0.0:11434" },
+      });
+      child.unref();
       require("child_process").spawnSync("sleep", ["2"]);
       console.log("  ✓ Using Ollama on localhost:11434");
       provider = "ollama-local";

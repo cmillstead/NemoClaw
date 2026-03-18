@@ -106,7 +106,7 @@ describe("PARA file I/O", () => {
       expect(content).toContain('category: "areas"');
       expect(content).toContain('status: "active"');
       expect(content).toContain('source_type: "user"');
-      expect(content).toContain("- language-choice");
+      expect(content).toContain('- "language-choice"');
       expect(content).toContain("> Part of [[_index]]");
     });
 
