@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import type { PluginLogger, NemoClawConfig } from "../index.js";
 import {
   loadOnboardConfig,
@@ -36,14 +36,23 @@ const DEFAULT_MODELS = [
 ];
 
 function detectOllama(): { installed: boolean; running: boolean } {
-  const installed = testCommand("command -v ollama >/dev/null 2>&1");
-  const running = testCommand("curl -sf http://localhost:11434/api/tags >/dev/null 2>&1");
+  const installed = testCommandExists("ollama");
+  const running = testEndpointReachable("http://localhost:11434/api/tags");
   return { installed, running };
 }
 
-function testCommand(command: string): boolean {
+function testCommandExists(name: string): boolean {
   try {
-    execSync(command, { encoding: "utf-8", stdio: "ignore", shell: "/bin/bash" });
+    execFileSync("which", [name], { stdio: "ignore", timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function testEndpointReachable(url: string): boolean {
+  try {
+    execFileSync("curl", ["-sf", url], { stdio: "ignore", timeout: 5000 });
     return true;
   } catch {
     return false;

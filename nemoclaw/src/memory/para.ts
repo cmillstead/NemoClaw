@@ -34,7 +34,7 @@ export function ensureMemoryDirs(memoryDir: string): void {
   ];
   for (const dir of dirs) {
     if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
     }
   }
 }
@@ -138,7 +138,7 @@ export function writeFact(
     throw new Error(`Path validation failed: ${pathValidation.reason ?? ""}`);
   }
 
-  writeFileSync(filePath, content, "utf-8");
+  writeFileSync(filePath, content, { encoding: "utf-8", mode: 0o600 });
 
   return {
     filePath: join(category, filename),
@@ -287,7 +287,7 @@ export function supersedeFact(filePath: string, supersededById?: string): boolea
       /^updated_at: .*$/m,
       `updated_at: ${JSON.stringify(new Date().toISOString())}`,
     );
-    writeFileSync(filePath, updated, "utf-8");
+    writeFileSync(filePath, updated, { encoding: "utf-8", mode: 0o600 });
     return true;
   } catch {
     return false;
@@ -309,7 +309,10 @@ export function updateRootMoc(memoryDir: string): void {
     `> Updated ${new Date().toISOString().split("T")[0]}`,
     "",
   ];
-  writeFileSync(join(memoryDir, "_index.md"), lines.join("\n") + "\n", "utf-8");
+  writeFileSync(join(memoryDir, "_index.md"), lines.join("\n") + "\n", {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
 }
 
 /**
@@ -331,7 +334,7 @@ export function updateCategoryMoc(memoryDir: string, category: ParaCategory): vo
     `> Part of [[_index]]`,
     "",
   ];
-  writeFileSync(join(dir, "_index.md"), lines.join("\n"), "utf-8");
+  writeFileSync(join(dir, "_index.md"), lines.join("\n"), { encoding: "utf-8", mode: 0o600 });
 }
 
 /**
@@ -349,5 +352,8 @@ export function regenerateManifest(memoryDir: string): void {
     manifest[relativePath] = hash;
   }
 
-  writeFileSync(join(memoryDir, "_manifest.json"), JSON.stringify(manifest, null, 2), "utf-8");
+  writeFileSync(join(memoryDir, "_manifest.json"), JSON.stringify(manifest, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
 }

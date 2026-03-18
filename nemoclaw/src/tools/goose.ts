@@ -9,6 +9,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { scanForSecrets } from "../memory/sanitize.js";
 
 const DEFAULT_MAX_TURNS = 25;
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -169,6 +170,9 @@ export function runGoose(
     return parseGooseOutput(output);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { success: false, response: "", error: `Goose execution failed: ${message}` };
+    const sanitized = scanForSecrets(message).valid
+      ? message
+      : "Goose execution failed (error details redacted for security)";
+    return { success: false, response: "", error: `Goose execution failed: ${sanitized}` };
   }
 }

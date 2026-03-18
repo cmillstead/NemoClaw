@@ -65,16 +65,17 @@ function captureLogger(): { lines: string[]; logger: PluginLogger } {
  * Injected via StatusDeps — no module-level patching needed.
  */
 function fakeExec(responses: Record<string, string | Error>): StatusDeps["execAsync"] {
-  return (cmd: string) => {
+  return (cmd: string, args: string[]) => {
+    const fullCmd = [cmd, ...args].join(" ");
     for (const [substring, response] of Object.entries(responses)) {
-      if (cmd.includes(substring)) {
+      if (fullCmd.includes(substring)) {
         if (response instanceof Error) {
           return Promise.reject(response);
         }
         return Promise.resolve({ stdout: response, stderr: "" });
       }
     }
-    return Promise.reject(new Error(`command not found: ${cmd}`));
+    return Promise.reject(new Error(`command not found: ${fullCmd}`));
   };
 }
 
@@ -382,9 +383,10 @@ describe("cliStatus", () => {
       const execCalls: string[] = [];
       const { lines, logger } = captureLogger();
       const deps = makeDeps({
-        execAsync: (cmd: string) => {
-          execCalls.push(cmd);
-          if (cmd.includes("sandbox status")) {
+        execAsync: (cmd: string, args: string[]) => {
+          const fullCmd = [cmd, ...args].join(" ");
+          execCalls.push(fullCmd);
+          if (fullCmd.includes("sandbox status")) {
             return Promise.resolve({
               stdout: JSON.stringify({ state: "running", uptime: "1m" }),
               stderr: "",

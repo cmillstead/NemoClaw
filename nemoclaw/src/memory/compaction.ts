@@ -14,6 +14,7 @@
 
 import { randomBytes } from "node:crypto";
 import type { MessageRecord, CompactionExtraction, CompactionResult } from "./types.js";
+import { scanForSecrets } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
 // Stop words for topic extraction
@@ -250,6 +251,29 @@ export function estimateTokens(text: string): number {
 // ---------------------------------------------------------------------------
 
 /**
+ * Redact secrets from compaction summaries before storage.
+ */
+function redactSecretsInSummary(text: string): string {
+  const result = scanForSecrets(text);
+  if (result.valid) return text;
+  return text
+    .replace(/\bsk-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
+    .replace(/\bsk-or-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
+    .replace(/\bnvapi-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
+    .replace(/\bghp_[a-zA-Z0-9]{36,}\b/g, "[REDACTED]")
+    .replace(/\bghs_[a-zA-Z0-9]{36,}\b/g, "[REDACTED]")
+    .replace(/\bglpat-[a-zA-Z0-9]{20,}\b/g, "[REDACTED]")
+    .replace(/\bxoxb-[a-zA-Z0-9-]{20,}\b/g, "[REDACTED]")
+    .replace(/\bxoxp-[a-zA-Z0-9-]{20,}\b/g, "[REDACTED]")
+    .replace(
+      /-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END \1?PRIVATE KEY-----/g,
+      "[REDACTED]",
+    )
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]")
+    .replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, "[REDACTED]");
+}
+
+/**
  * Run extractive compaction on a list of messages.
  *
  * @param sessionId - Session ID
@@ -282,6 +306,9 @@ export function compact(
   // Format as structured summary
   const summary = formatSummary(extraction);
 
+  // Redact any secrets that leaked into the compaction summary (SEC-DAT-011)
+  const safeSummary = redactSecretsInSummary(summary);
+
   const compactionId = `comp-${new Date()
     .toISOString()
     .replace(/[-:T.Z]/g, "")
@@ -294,11 +321,11 @@ export function compact(
 
   return {
     id: compactionId,
-    summary,
+    summary: safeSummary,
     messageRangeStart: toCompact[0].id,
     messageRangeEnd: toCompact[toCompact.length - 1].id,
     originalTokenCount,
-    summaryTokenCount: estimateTokens(summary),
+    summaryTokenCount: estimateTokens(safeSummary),
     extraction,
   };
 }
