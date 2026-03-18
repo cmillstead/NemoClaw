@@ -183,6 +183,12 @@ def action_apply(
     Path(memory_host_path).mkdir(parents=True, exist_ok=True)
     create_args.extend(["--volume", f"{memory_host_path}:/sandbox/memory"])
 
+    # Install Goose CLI for code-writing tool
+    goose_script = Path(__file__).parent.parent / "scripts" / "install-goose.sh"
+    if goose_script.exists():
+        progress(75, "Installing Goose CLI")
+        run_cmd(["bash", str(goose_script), "/usr/local/bin"], check=False, capture=True)
+
     result = run_cmd(create_args, check=False, capture=True)
     if result.returncode != 0:
         if "already exists" in (result.stderr or ""):
