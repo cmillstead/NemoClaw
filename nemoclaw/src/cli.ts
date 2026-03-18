@@ -16,6 +16,10 @@ import { cliConnect } from "./commands/connect.js";
 import { cliEject } from "./commands/eject.js";
 import { cliLogs } from "./commands/logs.js";
 import { cliOnboard } from "./commands/onboard.js";
+import { join } from "node:path";
+import { existsSync, rmSync, readFileSync } from "node:fs";
+import { ensureMemoryDirs, updateRootMoc, listFacts, regenerateManifest } from "./memory/para.js";
+import { scanForSecrets, scanForInjection } from "./memory/sanitize.js";
 
 export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginApi): void {
   const { program, logger } = ctx;
@@ -133,4 +137,68 @@ export function registerCliCommands(ctx: PluginCliContext, api: OpenClawPluginAp
         });
       },
     );
+
+  // openclaw nemoclaw memory
+  const memory = nemoclaw.command("memory").description("Memory system management");
+
+  memory
+    .command("status")
+    .description("Memory system health and statistics")
+    .action(() => {
+      logger.info("Memory system status -- run inside agent session for full details.");
+    });
+
+  memory
+    .command("init")
+    .description("Initialize memory directory structure")
+    .action(() => {
+      const memoryDir = join(process.env.HOME ?? "/tmp", ".nemoclaw", "memory");
+      ensureMemoryDirs(memoryDir);
+      updateRootMoc(memoryDir);
+      logger.info(`Memory directory initialized at ${memoryDir}`);
+    });
+
+  memory
+    .command("purge")
+    .description("Delete all memory data")
+    .option("--confirm", "Required to actually delete", false)
+    .action((opts: { confirm: boolean }) => {
+      if (!opts.confirm) {
+        logger.info("Add --confirm to actually delete all memory data.");
+        return;
+      }
+      const memoryDir = join(process.env.HOME ?? "/tmp", ".nemoclaw", "memory");
+      // rmSync and existsSync imported at top level
+      if (existsSync(memoryDir)) {
+        rmSync(memoryDir, { recursive: true });
+        logger.info("All memory data deleted.");
+      } else {
+        logger.info("No memory data found.");
+      }
+    });
+
+  memory
+    .command("audit")
+    .description("Security scan all memory files")
+    .action(() => {
+      const memoryDir = join(process.env.HOME ?? "/tmp", ".nemoclaw", "memory");
+      // readFileSync imported at top level
+      const facts = listFacts(memoryDir);
+      let issues = 0;
+      for (const path of facts) {
+        const content = readFileSync(path, "utf-8");
+        const secretResult = scanForSecrets(content);
+        if (!secretResult.valid) {
+          logger.warn(`SECRET: ${path} -- ${secretResult.reason ?? "unknown"}`);
+          issues++;
+        }
+        const injectionResult = scanForInjection(content);
+        if (!injectionResult.valid) {
+          logger.warn(`INJECTION: ${path} -- ${injectionResult.reason ?? "unknown"}`);
+          issues++;
+        }
+      }
+      regenerateManifest(memoryDir);
+      logger.info(`Audit complete: ${facts.length} files scanned, ${issues} issues found.`);
+    });
 }

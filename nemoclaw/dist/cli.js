@@ -11,6 +11,10 @@ const connect_js_1 = require("./commands/connect.js");
 const eject_js_1 = require("./commands/eject.js");
 const logs_js_1 = require("./commands/logs.js");
 const onboard_js_1 = require("./commands/onboard.js");
+const node_path_1 = require("node:path");
+const node_fs_1 = require("node:fs");
+const para_js_1 = require("./memory/para.js");
+const sanitize_js_1 = require("./memory/sanitize.js");
 function registerCliCommands(ctx, api) {
     const { program, logger } = ctx;
     const pluginConfig = (0, index_js_1.getPluginConfig)(api);
@@ -96,7 +100,7 @@ function registerCliCommands(ctx, api) {
         .command("onboard")
         .description("Interactive setup: configure inference endpoint, credential, and model")
         .option("--api-key <key>", "API key for endpoints that require one (skips prompt)")
-        .option("--endpoint <type>", "Endpoint type: build, ncp, nim-local, vllm, ollama, custom (local options are experimental)")
+        .option("--endpoint <type>", "Endpoint type: build, ncp, openrouter, nim-local, vllm, ollama, custom")
         .option("--ncp-partner <name>", "NCP partner name (when endpoint is ncp)")
         .option("--endpoint-url <url>", "Endpoint URL (for ncp, nim-local, ollama, or custom)")
         .option("--model <model>", "Model ID to use")
@@ -110,6 +114,66 @@ function registerCliCommands(ctx, api) {
             logger,
             pluginConfig,
         });
+    });
+    // openclaw nemoclaw memory
+    const memory = nemoclaw.command("memory").description("Memory system management");
+    memory
+        .command("status")
+        .description("Memory system health and statistics")
+        .action(() => {
+        logger.info("Memory system status -- run inside agent session for full details.");
+    });
+    memory
+        .command("init")
+        .description("Initialize memory directory structure")
+        .action(() => {
+        const memoryDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".nemoclaw", "memory");
+        (0, para_js_1.ensureMemoryDirs)(memoryDir);
+        (0, para_js_1.updateRootMoc)(memoryDir);
+        logger.info(`Memory directory initialized at ${memoryDir}`);
+    });
+    memory
+        .command("purge")
+        .description("Delete all memory data")
+        .option("--confirm", "Required to actually delete", false)
+        .action((opts) => {
+        if (!opts.confirm) {
+            logger.info("Add --confirm to actually delete all memory data.");
+            return;
+        }
+        const memoryDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".nemoclaw", "memory");
+        // rmSync and existsSync imported at top level
+        if ((0, node_fs_1.existsSync)(memoryDir)) {
+            (0, node_fs_1.rmSync)(memoryDir, { recursive: true });
+            logger.info("All memory data deleted.");
+        }
+        else {
+            logger.info("No memory data found.");
+        }
+    });
+    memory
+        .command("audit")
+        .description("Security scan all memory files")
+        .action(() => {
+        const memoryDir = (0, node_path_1.join)(process.env.HOME ?? "/tmp", ".nemoclaw", "memory");
+        // readFileSync imported at top level
+        const facts = (0, para_js_1.listFacts)(memoryDir);
+        let issues = 0;
+        for (const path of facts) {
+            const content = (0, node_fs_1.readFileSync)(path, "utf-8");
+            const secretResult = (0, sanitize_js_1.scanForSecrets)(content);
+            if (!secretResult.valid) {
+                logger.warn(`SECRET: ${path} -- ${secretResult.reason ?? "unknown"}`);
+                issues++;
+            }
+            const injectionResult = (0, sanitize_js_1.scanForInjection)(content);
+            if (!injectionResult.valid) {
+                logger.warn(`INJECTION: ${path} -- ${injectionResult.reason ?? "unknown"}`);
+                issues++;
+            }
+        }
+        (0, para_js_1.regenerateManifest)(memoryDir);
+        logger.info(`Audit complete: ${facts.length} files scanned, ${issues} issues found.`);
     });
 }
 //# sourceMappingURL=cli.js.map

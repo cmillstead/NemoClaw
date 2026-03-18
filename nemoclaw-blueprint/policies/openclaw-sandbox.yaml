@@ -29,6 +29,7 @@ filesystem_policy:
     - /sandbox
     - /tmp
     - /dev/null
+    - /sandbox/memory   # Mounted from ~/.nemoclaw/memory/
 
 landlock:
   compatibility: best_effort

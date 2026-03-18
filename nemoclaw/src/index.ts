@@ -15,6 +15,8 @@ import type { Command } from "commander";
 import { registerCliCommands } from "./cli.js";
 import { handleSlashCommand } from "./commands/slash.js";
 import { loadOnboardConfig } from "./onboard/config.js";
+import { createMemoryService } from "./memory/service.js";
+import { handleMemorySlashCommand } from "./commands/memory.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -184,6 +186,17 @@ export default function register(api: OpenClawPluginApi): void {
     acceptsArgs: true,
     handler: (ctx) => handleSlashCommand(ctx, api),
   });
+
+  // 1b. Register /memory slash command
+  api.registerCommand({
+    name: "memory",
+    description: "Memory management (search, remember, facts, status).",
+    acceptsArgs: true,
+    handler: (ctx) => handleMemorySlashCommand(ctx, api),
+  });
+
+  // 1c. Register memory background service
+  api.registerService(createMemoryService(api));
 
   // 2. Register `openclaw nemoclaw` CLI subcommands (commander.js)
   api.registerCli(

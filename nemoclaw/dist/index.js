@@ -7,6 +7,8 @@ exports.default = register;
 const cli_js_1 = require("./cli.js");
 const slash_js_1 = require("./commands/slash.js");
 const config_js_1 = require("./onboard/config.js");
+const service_js_1 = require("./memory/service.js");
+const memory_js_1 = require("./commands/memory.js");
 const DEFAULT_PLUGIN_CONFIG = {
     blueprintVersion: "latest",
     blueprintRegistry: "ghcr.io/nvidia/nemoclaw-blueprint",
@@ -41,59 +43,99 @@ function register(api) {
         acceptsArgs: true,
         handler: (ctx) => (0, slash_js_1.handleSlashCommand)(ctx, api),
     });
+    // 1b. Register /memory slash command
+    api.registerCommand({
+        name: "memory",
+        description: "Memory management (search, remember, facts, status).",
+        acceptsArgs: true,
+        handler: (ctx) => (0, memory_js_1.handleMemorySlashCommand)(ctx, api),
+    });
+    // 1c. Register memory background service
+    api.registerService((0, service_js_1.createMemoryService)(api));
     // 2. Register `openclaw nemoclaw` CLI subcommands (commander.js)
     api.registerCli((cliCtx) => {
         (0, cli_js_1.registerCliCommands)(cliCtx, api);
     }, { commands: ["nemoclaw"] });
-    // 3. Register nvidia-nim provider — use onboard config if available
+    // 3. Register provider -- use onboard config if available, fall back to NVIDIA defaults
     const onboardCfg = (0, config_js_1.loadOnboardConfig)();
-    const providerCredentialEnv = onboardCfg?.credentialEnv ?? "NVIDIA_API_KEY";
-    const providerLabel = onboardCfg
-        ? `NVIDIA NIM (${onboardCfg.endpointType}${onboardCfg.ncpPartner ? ` - ${onboardCfg.ncpPartner}` : ""})`
-        : "NVIDIA NIM (build.nvidia.com)";
-    api.registerProvider({
-        id: "nvidia-nim",
-        label: providerLabel,
-        docsPath: "https://build.nvidia.com/docs",
-        aliases: ["nvidia", "nim"],
-        envVars: [providerCredentialEnv],
-        models: {
-            chat: [
+    if (onboardCfg) {
+        // Dynamic registration based on what the user onboarded with
+        const providerCredentialEnv = onboardCfg.credentialEnv;
+        const providerLabel = onboardCfg.providerLabel ??
+            `${onboardCfg.endpointType}${onboardCfg.ncpPartner ? ` - ${onboardCfg.ncpPartner}` : ""}`;
+        api.registerProvider({
+            id: onboardCfg.endpointType === "build" ? "nvidia-nim" : onboardCfg.endpointType,
+            label: providerLabel,
+            docsPath: onboardCfg.endpointType === "openrouter"
+                ? "https://openrouter.ai/docs"
+                : "https://build.nvidia.com/docs",
+            envVars: [providerCredentialEnv],
+            models: {
+                chat: [
+                    {
+                        id: onboardCfg.model,
+                        label: onboardCfg.model,
+                        contextWindow: 131072,
+                        maxOutput: 8192,
+                    },
+                ],
+            },
+            auth: [
                 {
-                    id: "nvidia/nemotron-3-super-120b-a12b",
-                    label: "Nemotron 3 Super 120B (March 2026)",
-                    contextWindow: 131072,
-                    maxOutput: 8192,
-                },
-                {
-                    id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-                    label: "Nemotron Ultra 253B",
-                    contextWindow: 131072,
-                    maxOutput: 4096,
-                },
-                {
-                    id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-                    label: "Nemotron Super 49B v1.5",
-                    contextWindow: 131072,
-                    maxOutput: 4096,
-                },
-                {
-                    id: "nvidia/nemotron-3-nano-30b-a3b",
-                    label: "Nemotron 3 Nano 30B",
-                    contextWindow: 131072,
-                    maxOutput: 4096,
+                    type: "bearer",
+                    envVar: providerCredentialEnv,
+                    headerName: "Authorization",
+                    label: `API Key (${providerCredentialEnv})`,
                 },
             ],
-        },
-        auth: [
-            {
-                type: "bearer",
-                envVar: providerCredentialEnv,
-                headerName: "Authorization",
-                label: `NVIDIA API Key (${providerCredentialEnv})`,
+        });
+    }
+    else {
+        // Default: register NVIDIA NIM provider (no onboard config yet)
+        api.registerProvider({
+            id: "nvidia-nim",
+            label: "NVIDIA NIM (build.nvidia.com)",
+            docsPath: "https://build.nvidia.com/docs",
+            aliases: ["nvidia", "nim"],
+            envVars: ["NVIDIA_API_KEY"],
+            models: {
+                chat: [
+                    {
+                        id: "nvidia/nemotron-3-super-120b-a12b",
+                        label: "Nemotron 3 Super 120B (March 2026)",
+                        contextWindow: 131072,
+                        maxOutput: 8192,
+                    },
+                    {
+                        id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+                        label: "Nemotron Ultra 253B",
+                        contextWindow: 131072,
+                        maxOutput: 4096,
+                    },
+                    {
+                        id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+                        label: "Nemotron Super 49B v1.5",
+                        contextWindow: 131072,
+                        maxOutput: 4096,
+                    },
+                    {
+                        id: "nvidia/nemotron-3-nano-30b-a3b",
+                        label: "Nemotron 3 Nano 30B",
+                        contextWindow: 131072,
+                        maxOutput: 4096,
+                    },
+                ],
             },
-        ],
-    });
+            auth: [
+                {
+                    type: "bearer",
+                    envVar: "NVIDIA_API_KEY",
+                    headerName: "Authorization",
+                    label: "NVIDIA API Key (NVIDIA_API_KEY)",
+                },
+            ],
+        });
+    }
     const bannerEndpoint = onboardCfg?.endpointType ?? "build.nvidia.com";
     const bannerModel = onboardCfg?.model ?? "nvidia/nemotron-3-super-120b-a12b";
     api.logger.info("");
