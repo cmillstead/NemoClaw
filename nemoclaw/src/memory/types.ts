@@ -149,3 +149,52 @@ export interface MemoryServiceState {
   tokenCount: number;
   compactionCount: number;
 }
+
+// ---------------------------------------------------------------------------
+// ContextEngine types
+// ---------------------------------------------------------------------------
+
+export interface ContextEnginePlugin {
+  id: string;
+  prepareSubagentSpawn?: (ctx: SubagentSpawnContext) => string | null;
+  onSubagentEnded?: (ctx: SubagentEndedContext) => void;
+  afterTurn?: (ctx: AfterTurnContext) => void;
+}
+
+export interface SubagentSpawnContext {
+  task: string;
+  parentSessionId: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SubagentEndedContext {
+  sessionId: string;
+  parentSessionId: string;
+  messages: MessageRecord[];
+  exitReason: "completed" | "timeout" | "error";
+  metadata?: Record<string, unknown>;
+}
+
+export interface AfterTurnContext {
+  sessionId: string;
+  role: MessageRole;
+  tokenCount: number;
+}
+
+/**
+ * Spawn function injected from the OpenClaw host API.
+ * Bound during plugin registration; null if spawn API is unavailable.
+ * When null, all async operations fall back to synchronous execution.
+ */
+export type SpawnSession = ((opts: {
+  task: string;
+  mode?: "run" | "session";
+  sandbox?: "inherit" | "require";
+  runTimeoutSeconds?: number;
+  cleanup?: "delete" | "keep";
+  label?: string;
+  metadata?: Record<string, unknown>;
+}) => string) | null;
+
+/** Metadata marker for NemoClaw-spawned internal subagents. */
+export type NemoClawOp = "compact" | "promote" | "janitor";

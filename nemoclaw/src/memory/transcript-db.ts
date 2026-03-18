@@ -263,6 +263,13 @@ export class TranscriptDb {
     return row.count;
   }
 
+  getGlobalPromotedFactCount(): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) as count FROM promoted_facts")
+      .get() as { count: number };
+    return row.count;
+  }
+
   // -------------------------------------------------------------------------
   // Integrity
   // -------------------------------------------------------------------------
