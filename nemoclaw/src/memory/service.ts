@@ -17,15 +17,22 @@ import { SessionManager } from "./session.js";
 import { ensureMemoryDirs } from "./para.js";
 import { DEFAULT_MEMORY_CONFIG } from "./types.js";
 import type { MemoryConfig } from "./types.js";
+import { Orchestrator } from "./orchestrator.js";
+import type { SpawnSession } from "./types.js";
 
 let activeSessionManager: SessionManager | null = null;
 let activeDb: TranscriptDb | null = null;
+let activeOrchestrator: Orchestrator | null = null;
 
 /**
  * Get the active session manager (for use by commands).
  */
 export function getSessionManager(): SessionManager | null {
   return activeSessionManager;
+}
+
+export function getOrchestrator(): Orchestrator | null {
+  return activeOrchestrator;
 }
 
 /**
@@ -45,7 +52,7 @@ function resolveMemoryDir(): string {
 /**
  * Create the memory service for plugin registration.
  */
-export function createMemoryService(_api: OpenClawPluginApi): PluginService {
+export function createMemoryService(_api: OpenClawPluginApi, spawner: SpawnSession = null): PluginService {
   return {
     id: "nemoclaw-memory",
     start: (ctx: { config: OpenClawConfig; logger: PluginLogger }) => {
@@ -73,6 +80,10 @@ export function createMemoryService(_api: OpenClawPluginApi): PluginService {
         activeSessionManager = sessionManager;
         activeDb = db;
 
+        const orchestrator = new Orchestrator(spawner, memoryDir, logger);
+        sessionManager.setOrchestrator(orchestrator);
+        activeOrchestrator = orchestrator;
+
         logger.info(`Memory service started (dir: ${memoryDir})`);
       } catch (err) {
         logger.error(`Memory service failed to start: ${String(err)}`);
@@ -91,6 +102,7 @@ export function createMemoryService(_api: OpenClawPluginApi): PluginService {
         if (activeDb) {
           activeDb.close();
           activeDb = null;
+          activeOrchestrator = null;
         }
 
         logger.info("Memory service stopped");

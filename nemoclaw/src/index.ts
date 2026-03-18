@@ -15,8 +15,10 @@ import type { Command } from "commander";
 import { registerCliCommands } from "./cli.js";
 import { handleSlashCommand } from "./commands/slash.js";
 import { loadOnboardConfig } from "./onboard/config.js";
-import { createMemoryService } from "./memory/service.js";
+import { createMemoryService, getSessionManager, getOrchestrator } from "./memory/service.js";
 import { handleMemorySlashCommand } from "./commands/memory.js";
+import { handlePrepareSubagentSpawn, handleSubagentEnded, handleAfterTurn } from "./memory/context-hooks.js";
+import type { SubagentSpawnContext, SubagentEndedContext, AfterTurnContext, SpawnSession, NemoClawOp, ContextEnginePlugin } from "./memory/types.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw Plugin SDK compatible types (mirrors openclaw/plugin-sdk)
@@ -132,6 +134,7 @@ export interface OpenClawPluginApi {
   registerService: (service: PluginService) => void;
   resolvePath: (input: string) => string;
   on: (hookName: string, handler: (...args: unknown[]) => void) => void;
+  registerContextEngine?: (engine: ContextEnginePlugin) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,8 +198,71 @@ export default function register(api: OpenClawPluginApi): void {
     handler: (ctx) => handleMemorySlashCommand(ctx, api),
   });
 
-  // 1c. Register memory background service
-  api.registerService(createMemoryService(api));
+  // 1d. Bind SpawnSession from the API (if available)
+  const spawner: SpawnSession = typeof (api as Record<string, unknown>).spawn === "function"
+    ? ((api as Record<string, unknown>).spawn as SpawnSession)
+    : null;
+
+  // 1c. Register memory background service (with spawner for async ops)
+  api.registerService(createMemoryService(api, spawner));
+
+  // 1e. Register ContextEngine hooks (if API supports it)
+  if (api.registerContextEngine) {
+    api.registerContextEngine({
+      id: "nemoclaw-memory",
+      prepareSubagentSpawn: (ctx: SubagentSpawnContext) => {
+        const mgr = getSessionManager();
+        if (!mgr) return null;
+        return handlePrepareSubagentSpawn(ctx, mgr, mgr.getConfig(), api.logger);
+      },
+      onSubagentEnded: (ctx: SubagentEndedContext) => {
+        const mgr = getSessionManager();
+        if (!mgr) return;
+        const db = mgr.getDb();
+        const promoted = handleSubagentEnded(ctx, db, mgr.getConfig(), api.logger);
+
+        // Release janitor lock if this was a janitor subagent
+        const op = ctx.metadata?._nemoclawOp as NemoClawOp | undefined;
+        if (op === "janitor") {
+          getOrchestrator()?.releaseJanitorLock();
+        }
+
+        // Check janitor trigger (global count)
+        if (promoted.length > 0) {
+          const totalCount = db.getGlobalPromotedFactCount();
+          const orch = getOrchestrator();
+          if (orch?.shouldTriggerJanitor(totalCount)) {
+            orch.spawnJanitor();
+          }
+        }
+      },
+      afterTurn: (ctx: AfterTurnContext) => {
+        const mgr = getSessionManager();
+        if (!mgr) return;
+        handleAfterTurn(ctx, mgr, getOrchestrator(), api.logger);
+      },
+    });
+    api.logger.info("ContextEngine hooks registered (memory-aware subagents enabled)");
+  } else {
+    // Fallback: try api.on() event registration.
+    // NOTE: api.on() handlers have void return type, so prepareSubagentSpawn
+    // context injection may not work via this path. Fact capture still works.
+    try {
+      api.on("prepareSubagentSpawn", (ctx: unknown) => {
+        const mgr = getSessionManager();
+        if (!mgr) return;
+        handlePrepareSubagentSpawn(ctx as SubagentSpawnContext, mgr, mgr.getConfig(), api.logger);
+      });
+      api.on("subagentEnded", (ctx: unknown) => {
+        const mgr = getSessionManager();
+        if (!mgr) return;
+        handleSubagentEnded(ctx as SubagentEndedContext, mgr.getDb(), mgr.getConfig(), api.logger);
+      });
+      api.logger.info("ContextEngine hooks registered via api.on() fallback");
+    } catch {
+      api.logger.info("ContextEngine hooks not available — memory system runs without subagent awareness");
+    }
+  }
 
   // 2. Register `openclaw nemoclaw` CLI subcommands (commander.js)
   api.registerCli(
